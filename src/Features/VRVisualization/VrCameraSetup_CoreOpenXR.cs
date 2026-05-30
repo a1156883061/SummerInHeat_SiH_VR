@@ -878,7 +878,7 @@ namespace UnityVRMod.Features.VrVisualization
             bool originalInvertCulling = GL.invertCulling;
             GL.invertCulling = true;
             currentEyeCamera.Render();
-            if (EnableOpenXrPostFxSync)
+            if (EnableOpenXrPostFxSync && !(ConfigManager.OpenXR_DisablePostFxSync?.Value == true))
             {
                 RenderHdrEffectCameraForEye(eyeIndex, currentEyeCamera, currentIntermediateRT);
             }
@@ -2631,6 +2631,12 @@ namespace UnityVRMod.Features.VrVisualization
         {
             if (mainCamera == null || _leftVrCamera == null || _rightVrCamera == null)
             {
+                return;
+            }
+
+            if (ConfigManager.OpenXR_DisablePostFxSync?.Value == true)
+            {
+                VRModCore.Log("[PostFX][OpenXR] Post-processing sync disabled by config. Skipping.");
                 return;
             }
 

@@ -28,6 +28,7 @@ namespace UnityVRMod.Config
 
         // --- Backend-Specific Stability Settings ---
 #if OPENVR_BUILD
+        public static ConfigElement<bool> OpenVR_DisablePostFxSync;
         public static ConfigElement<int> OpenVR_WaitGetPosesDelayMs;
         public static ConfigElement<int> OpenVR_MaxRenderTargetDimension;
         public static ConfigElement<float> OpenVR_InitialEyeHeightAboveGroundMeters;
@@ -38,6 +39,7 @@ namespace UnityVRMod.Config
         public static ConfigElement<bool> OpenVR_MapRightMenuButtonToSpace;
 #endif
 #if OPENXR_BUILD
+        public static ConfigElement<bool> OpenXR_DisablePostFxSync;
         public static ConfigElement<float> OpenXR_GripDragSensitivity;
         public static ConfigElement<float> OpenXR_UiPanelScale;
         public static ConfigElement<float> OpenXR_PanelResizeSensitivity;
@@ -135,6 +137,9 @@ namespace UnityVRMod.Config
             
             // --- Backend-Specific Stability Settings ---
 #if OPENVR_BUILD
+            OpenVR_DisablePostFxSync = new ConfigElement<bool>("OpenVR Disable PostFX Sync",
+                "[OpenVR ONLY] If true, disables cloning of post-processing effects (Beautify, ScreenOverlay, etc.) from the game's main camera to VR eye cameras.", true);
+
             OpenVR_WaitGetPosesDelayMs = new ConfigElement<int>("OpenVR WaitGetPoses Delay (ms)",
                 "[OpenVR ONLY] A small delay (in milliseconds) before retrieving headset poses. Helps prevent crashes in some games.", 2);
 
@@ -160,6 +165,9 @@ namespace UnityVRMod.Config
                 "[OpenVR ONLY] If true, right controller Menu/B is injected as keyboard Space down/up. Useful for hold actions implemented via Input.GetKey(KeyCode.Space).", true);
 #endif
 #if OPENXR_BUILD
+            OpenXR_DisablePostFxSync = new ConfigElement<bool>("OpenXR Disable PostFX Sync",
+                "[OpenXR ONLY] If true, disables cloning of post-processing effects (Beautify, CameraFilterPack, etc.) from the game's main camera to VR eye cameras. Disable to remove blur/DOF effects in VR.", true);
+
             OpenXR_GripDragSensitivity = new ConfigElement<float>("OpenXR Grip Drag Sensitivity",
                 "[OpenXR ONLY] Multiplier for Grip drag translation. Lower values reduce motion intensity and nausea.", 0.45f);
 
