@@ -52,8 +52,10 @@ jobs:
         run: |
           Compress-Archive -Path Release/OpenXR/UnityVRMod.BepInEx.IL2CPP/* -DestinationPath UnityVRMod-${{ env.VERSION }}-OpenXR-IL2CPP.zip
           Compress-Archive -Path Release/OpenXR/UnityVRMod.BepInEx.Mono/* -DestinationPath UnityVRMod-${{ env.VERSION }}-OpenXR-Mono.zip
+          Compress-Archive -Path Release/OpenXR/UnityVRMod.BepInEx5.Mono/* -DestinationPath UnityVRMod-${{ env.VERSION }}-OpenXR-BIE5-Mono.zip
           Compress-Archive -Path Release/OpenVR/UnityVRMod.BepInEx.IL2CPP/* -DestinationPath UnityVRMod-${{ env.VERSION }}-OpenVR-IL2CPP.zip
           Compress-Archive -Path Release/OpenVR/UnityVRMod.BepInEx.Mono/* -DestinationPath UnityVRMod-${{ env.VERSION }}-OpenVR-Mono.zip
+          Compress-Archive -Path Release/OpenVR/UnityVRMod.BepInEx5.Mono/* -DestinationPath UnityVRMod-${{ env.VERSION }}-OpenVR-BIE5-Mono.zip
           
       # Step 6: If this is a 'release' event, upload the zipped artifacts to the GitHub Release page
       - name: Upload Assets to Release
