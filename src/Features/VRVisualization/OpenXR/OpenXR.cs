@@ -160,6 +160,7 @@ namespace UnityVRMod.Features.VRVisualization.OpenXR
         public const int XR_MAX_ACTION_NAME_SIZE = 64;
         public const int XR_MAX_LOCALIZED_ACTION_SET_NAME_SIZE = 128;
         public const int XR_MAX_LOCALIZED_ACTION_NAME_SIZE = 128;
+        public static ulong XR_API_VERSION_1_0 = (1UL << 48);
         public static ulong XR_API_VERSION_1_1 = (1UL << 48) | (1UL << 32);
         public const string XR_KHR_D3D11_ENABLE_EXTENSION_NAME = "XR_KHR_D3D11_enable";
     }
