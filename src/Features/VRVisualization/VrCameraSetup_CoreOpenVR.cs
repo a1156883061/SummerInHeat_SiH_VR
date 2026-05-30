@@ -1180,6 +1180,12 @@ namespace UnityVRMod.Features.VrVisualization
         {
             if (sourceCamera == null) return;
 
+            if (ConfigManager.OpenVR_DisablePostFxSync?.Value == true)
+            {
+                VRModCore.Log("[PostFX][OpenVR] Post-processing sync disabled by config. Skipping.");
+                return;
+            }
+
             Camera hdrSourceCamera = FindHdrEffectSourceCamera(sourceCamera);
             Camera effectSource = hdrSourceCamera != null ? hdrSourceCamera : sourceCamera;
             int leftCount = SyncMinimalPostProcessingForEye(effectSource, _leftVrCamera, _leftVrCamera);
