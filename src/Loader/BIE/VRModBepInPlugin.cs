@@ -11,7 +11,7 @@ using UnityVRMod.Loader;
 #if CPP
 using BepInEx.Unity.IL2CPP;
 #endif
-#if MONO
+#if MONO && !BIE5
 using BepInEx.Unity.Mono;
 #endif
 

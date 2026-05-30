@@ -10,7 +10,7 @@
     <WarningLevel>8</WarningLevel>
     <RootNamespace>UnityVRMod</RootNamespace>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>    
-	<Configurations>BIE_Unity_Mono_OpenVR_Debug;BIE_Unity_Mono_OpenVR_Release;BIE_Unity_Cpp_OpenVR_Debug;BIE_Unity_Cpp_OpenVR_Release;BIE_Unity_Mono_OpenXR_Debug;BIE_Unity_Mono_OpenXR_Release;BIE_Unity_Cpp_OpenXR_Debug;BIE_Unity_Cpp_OpenXR_Release</Configurations>
+	<Configurations>BIE_Unity_Mono_OpenVR_Debug;BIE_Unity_Mono_OpenVR_Release;BIE_Unity_Cpp_OpenVR_Debug;BIE_Unity_Cpp_OpenVR_Release;BIE_Unity_Mono_OpenXR_Debug;BIE_Unity_Mono_OpenXR_Release;BIE_Unity_Cpp_OpenXR_Debug;BIE_Unity_Cpp_OpenXR_Release;BIE5_Unity_Mono_OpenVR_Debug;BIE5_Unity_Mono_OpenVR_Release;BIE5_Unity_Mono_OpenXR_Debug;BIE5_Unity_Mono_OpenXR_Release</Configurations>
     <NoWarn>$(NoWarn);NU1603</NoWarn>
   </PropertyGroup>
 
@@ -111,6 +111,50 @@
     <DebugType>none</DebugType>
   </PropertyGroup>
 
+  <!-- BepInEx 5 Unity MONO - OpenVR - DEBUG -->
+  <PropertyGroup Condition="'$(Configuration)'=='BIE5_Unity_Mono_OpenVR_Debug'">
+    <TargetFramework>net46</TargetFramework>
+    <OutputPath>..\Release\OpenVR\UnityVRMod.BepInEx5.Mono.Debug\</OutputPath>
+    <DefineConstants>DEBUG,MONO,BIE,BIE5,ENABLE_VDEBUG_LOGGING,OPENVR_BUILD</DefineConstants>
+    <AssemblyName>UnityVRMod.BepInEx5.Mono_OpenVR</AssemblyName>
+    <Optimize>false</Optimize>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>portable</DebugType>
+  </PropertyGroup>
+
+  <!-- BepInEx 5 Unity MONO - OpenVR - RELEASE -->
+  <PropertyGroup Condition="'$(Configuration)'=='BIE5_Unity_Mono_OpenVR_Release'">
+    <TargetFramework>net46</TargetFramework>
+    <OutputPath>..\Release\OpenVR\UnityVRMod.BepInEx5.Mono\</OutputPath>
+    <DefineConstants>MONO,BIE,BIE5,OPENVR_BUILD</DefineConstants>
+    <AssemblyName>UnityVRMod.BepInEx5.Mono_OpenVR</AssemblyName>
+    <Optimize>true</Optimize>
+    <DebugSymbols>false</DebugSymbols>
+    <DebugType>none</DebugType>
+  </PropertyGroup>
+
+  <!-- BepInEx 5 Unity MONO - OpenXR - DEBUG -->
+  <PropertyGroup Condition="'$(Configuration)'=='BIE5_Unity_Mono_OpenXR_Debug'">
+    <TargetFramework>net46</TargetFramework>
+    <OutputPath>..\Release\OpenXR\UnityVRMod.BepInEx5.Mono.Debug\</OutputPath>
+    <DefineConstants>DEBUG,MONO,BIE,BIE5,ENABLE_VDEBUG_LOGGING,OPENXR_BUILD</DefineConstants>
+    <AssemblyName>UnityVRMod.BepInEx5.Mono_OpenXR</AssemblyName>
+    <Optimize>false</Optimize>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>portable</DebugType>
+  </PropertyGroup>
+
+  <!-- BepInEx 5 Unity MONO - OpenXR - RELEASE -->
+  <PropertyGroup Condition="'$(Configuration)'=='BIE5_Unity_Mono_OpenXR_Release'">
+    <TargetFramework>net46</TargetFramework>
+    <OutputPath>..\Release\OpenXR\UnityVRMod.BepInEx5.Mono\</OutputPath>
+    <DefineConstants>MONO,BIE,BIE5,OPENXR_BUILD</DefineConstants>
+    <AssemblyName>UnityVRMod.BepInEx5.Mono_OpenXR</AssemblyName>
+    <Optimize>true</Optimize>
+    <DebugSymbols>false</DebugSymbols>
+    <DebugType>none</DebugType>
+  </PropertyGroup>
+
   <!-- Conditional Source File Compilation -->
   <ItemGroup>
     <Compile Remove="Features\VRVisualization\VrCameraSetup_CoreOpenVR.cs" />
@@ -151,8 +195,8 @@
 
   <!-- ~~~~~ ASSEMBLY REFERENCES ~~~~~ -->
 
-  <!-- BepInEx 6 Unity Mono References -->
-  <ItemGroup Condition="$(DefineConstants.Contains('MONO')) AND $(DefineConstants.Contains('BIE'))">
+  <!-- BepInEx 6 Unity Mono References (excludes BIE5) -->
+  <ItemGroup Condition="$(DefineConstants.Contains('MONO')) AND $(DefineConstants.Contains('BIE')) AND !$(DefineConstants.Contains('BIE5'))">
     <Reference Include="BepInEx.Core">
 		<HintPath>..\lib\mono\BepInEx\BepInEx.Core.dll</HintPath>
 		<Private>False</Private>
@@ -181,6 +225,34 @@
 		<HintPath>..\lib\mono\UnityEngine.AudioModule.dll</HintPath> 
 		<Private>False</Private>
 	</Reference>
+  </ItemGroup>
+
+  <!-- BepInEx 5 Unity Mono References -->
+  <ItemGroup Condition="$(DefineConstants.Contains('MONO')) AND $(DefineConstants.Contains('BIE')) AND $(DefineConstants.Contains('BIE5'))">
+    <Reference Include="BepInEx">
+      <HintPath>..\lib\bie5\BepInEx.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="0Harmony">
+      <HintPath>..\lib\bie5\0Harmony.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>..\lib\mono\UnityEngine.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>..\lib\mono\UnityEngine.UI.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>..\lib\mono\UnityEngine.CoreModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UnityEngine.AudioModule">
+      <HintPath>..\lib\mono\UnityEngine.AudioModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
   </ItemGroup>
 
   <!-- BepInEx 6 Unity IL2CPP References -->

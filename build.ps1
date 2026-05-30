@@ -43,11 +43,13 @@ if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
 }
 
 $MsBuildExe = Resolve-MsBuildPath
-if ([string]::IsNullOrWhiteSpace($MsBuildExe)) {
-    Write-Error "MSBuild not found. Install Visual Studio 2022 Build Tools with MSBuild and C++ toolset (v143), or run this script from Developer PowerShell for VS."
-    exit 1
+$NativeBuildAvailable = ![string]::IsNullOrWhiteSpace($MsBuildExe)
+if (-not $NativeBuildAvailable) {
+    Write-Warning "MSBuild not found. Native C++ helper DLL ($NativeHelperDllName) will NOT be built. OpenXR builds may fail if $NativeHelperDllName is missing from lib/."
+    Write-Warning "To fix: Install Visual Studio 2022 Build Tools with MSBuild and C++ toolset (v143), or run from Developer PowerShell for VS."
+} else {
+    Write-Host "Using MSBuild: $MsBuildExe"
 }
-Write-Host "Using MSBuild: $MsBuildExe"
 
 # --- Define UniverseLib output paths ---
 $UniverseLibMonoDllPath = "UniverseLib/Release/UniverseLib.Mono/UniverseLib.Mono.dll"
@@ -67,26 +69,30 @@ if (Test-Path $UniverseLibSln) {
 
 # --- Build Native C++ Helper DLL (UnityGraphicsHelper.dll) ---
 if (Test-Path $NativeHelperProjectSolution) {
-    Write-Host "Building Native C++ Helper ($NativeHelperDllName)..."
-    $CppBuildConfig = if ($DebugHelper.IsPresent) { "Debug" } else { "Release" } 
-	Write-Host " Building $NativeHelperDllName with Configuration: $CppBuildConfig" 
-	
-	& $MsBuildExe $NativeHelperProjectSolution /p:Configuration=$CppBuildConfig /p:Platform=x64 /t:Build 
-    
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error "Native C++ Helper DLL build FAILED for configuration '$CppBuildConfig'. Aborting."
-        exit 1
-    }
+    if ($NativeBuildAvailable) {
+        Write-Host "Building Native C++ Helper ($NativeHelperDllName)..."
+        $CppBuildConfig = if ($DebugHelper.IsPresent) { "Debug" } else { "Release" }
+        Write-Host " Building $NativeHelperDllName with Configuration: $CppBuildConfig"
 
-    $ActualNativeHelperDllSourcePath = Join-Path (Join-Path $NativeHelperDllBuildOutputBase $CppBuildConfig) $NativeHelperDllName
+        & $MsBuildExe $NativeHelperProjectSolution /p:Configuration=$CppBuildConfig /p:Platform=x64 /t:Build
 
-    if (Test-Path $ActualNativeHelperDllSourcePath) {
-        if (-not (Test-Path $LibDir)) { New-Item -Path $LibDir -ItemType Directory -Force | Out-Null }
-        Copy-Item -Path $ActualNativeHelperDllSourcePath -Destination (Join-Path $LibDir $NativeHelperDllName) -Force
-        Write-Host "  $NativeHelperDllName built and copied to $LibDir."
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "Native C++ Helper DLL build FAILED for configuration '$CppBuildConfig'. Aborting."
+            exit 1
+        }
+
+        $ActualNativeHelperDllSourcePath = Join-Path (Join-Path $NativeHelperDllBuildOutputBase $CppBuildConfig) $NativeHelperDllName
+
+        if (Test-Path $ActualNativeHelperDllSourcePath) {
+            if (-not (Test-Path $LibDir)) { New-Item -Path $LibDir -ItemType Directory -Force | Out-Null }
+            Copy-Item -Path $ActualNativeHelperDllSourcePath -Destination (Join-Path $LibDir $NativeHelperDllName) -Force
+            Write-Host "  $NativeHelperDllName built and copied to $LibDir."
+        } else {
+            Write-Error "Native C++ Helper DLL ($NativeHelperDllName) not found at expected source path '$ActualNativeHelperDllSourcePath' after build. Aborting."
+            exit 1
+        }
     } else {
-        Write-Error "Native C++ Helper DLL ($NativeHelperDllName) not found at expected source path '$ActualNativeHelperDllSourcePath' after build. Aborting."
-        exit 1
+        Write-Warning "Skipping Native C++ Helper build (MSBuild unavailable)."
     }
 }
 Write-Host "--------------------------------------------------"
@@ -111,6 +117,13 @@ $Il2CppBaseDefinition = @{
     OutputPathPattern = "Release/{0}/$($YourModName).BepInEx.IL2CPP";
     UniverseLibDllPath = $UniverseLibIl2CppDllPath
 }
+$BIE5MonoBaseDefinition = @{
+    TargetRuntimeName = "BIE5-Mono";
+    ConfigNamePattern = "BIE5_Unity_Mono_{0}_{1}";
+    AssemblyNamePattern = "$($YourModName).BepInEx5.Mono_{0}";
+    OutputPathPattern = "Release/{0}/$($YourModName).BepInEx5.Mono";
+    UniverseLibDllPath = $UniverseLibMonoDllPath
+}
 
 # --- Determine which VR Backends to Process ---
 $VrBackendsToProcess = [System.Collections.Generic.List[string]]::new()
@@ -127,9 +140,16 @@ if (-not [string]::IsNullOrEmpty($VrBackend)) {
 $targetsToBuildActual = [System.Collections.Generic.List[System.Collections.Hashtable]]::new()
 $RuntimeDefinitionsToConsider = [System.Collections.Generic.List[System.Collections.Hashtable]]::new()
 
-if ($MonoOnly.IsPresent) { $RuntimeDefinitionsToConsider.Add($MonoBaseDefinition) }
+if ($MonoOnly.IsPresent) {
+    $RuntimeDefinitionsToConsider.Add($MonoBaseDefinition);
+    $RuntimeDefinitionsToConsider.Add($BIE5MonoBaseDefinition)
+}
 elseif ($Il2CppOnly.IsPresent) { $RuntimeDefinitionsToConsider.Add($Il2CppBaseDefinition) }
-else { $RuntimeDefinitionsToConsider.Add($MonoBaseDefinition); $RuntimeDefinitionsToConsider.Add($Il2CppBaseDefinition) }
+else {
+    $RuntimeDefinitionsToConsider.Add($MonoBaseDefinition);
+    $RuntimeDefinitionsToConsider.Add($Il2CppBaseDefinition);
+    $RuntimeDefinitionsToConsider.Add($BIE5MonoBaseDefinition)
+}
 
 foreach ($currentProcessingVrBackend in $VrBackendsToProcess) {
     Write-Host ""
