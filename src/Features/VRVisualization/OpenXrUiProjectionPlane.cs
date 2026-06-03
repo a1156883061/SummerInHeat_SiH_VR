@@ -43,6 +43,7 @@ namespace UnityVRMod.Features.VrVisualization
         private bool _isInitialized;
         private float _nextNguiProbeTime;
         private bool _loggedMissingNguiCamera;
+        private bool _isVisibilityManuallyToggled;
         private bool _isPanelAnchoredToRig;
         private Vector3 _anchoredLocalPos;
         private Quaternion _anchoredLocalRot;
@@ -624,10 +625,21 @@ namespace UnityVRMod.Features.VrVisualization
                 _loggedMissingNguiCamera = false;
             }
 
+            if (_isVisibilityManuallyToggled) return;
+
             if (_plane.activeSelf != hasSourceCamera)
             {
                 _plane.SetActive(hasSourceCamera);
             }
+        }
+
+        internal void ToggleVisibility()
+        {
+            if (_plane == null) return;
+            if (CameraJudge.IsHybrid2DSceneActive()) return;
+            _isVisibilityManuallyToggled = !_isVisibilityManuallyToggled;
+            _plane.SetActive(!_plane.activeSelf);
+            VRModCore.Log($"[UI][OpenXR] Panel manually toggled: {(_plane.activeSelf ? "Visible" : "Hidden")}");
         }
 
         private static bool HasActiveHybridSourceCamera()
