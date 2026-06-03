@@ -633,13 +633,15 @@ namespace UnityVRMod.Features.VrVisualization
             }
         }
 
-        internal void ToggleVisibility()
+        internal bool ToggleVisibility()
         {
-            if (_plane == null) return;
-            if (CameraJudge.IsHybrid2DSceneActive()) return;
+            if (_plane == null) return false;
+            if (CameraJudge.IsHybrid2DSceneActive()) return false;
             _isVisibilityManuallyToggled = !_isVisibilityManuallyToggled;
-            _plane.SetActive(!_plane.activeSelf);
-            VRModCore.Log($"[UI][OpenXR] Panel manually toggled: {(_plane.activeSelf ? "Visible" : "Hidden")}");
+            bool nowVisible = !_plane.activeSelf;
+            _plane.SetActive(nowVisible);
+            VRModCore.Log($"[UI][OpenXR] Panel manually toggled: {(nowVisible ? "Visible" : "Hidden")}");
+            return nowVisible;
         }
 
         private static bool HasActiveHybridSourceCamera()

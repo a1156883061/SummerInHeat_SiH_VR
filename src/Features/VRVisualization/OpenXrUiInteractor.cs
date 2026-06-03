@@ -1784,6 +1784,12 @@ namespace UnityVRMod.Features.VrVisualization
             SetControllerIconVisible(true);
         }
 
+        internal void SetUIRayVisible(bool visible)
+        {
+            if (_rayObject != null && _rayObject.activeSelf != visible)
+                _rayObject.SetActive(visible);
+        }
+
         private void SetControllerIconVisible(bool visible)
         {
             if (_controllerIconObject != null && _controllerIconObject.activeSelf != visible)

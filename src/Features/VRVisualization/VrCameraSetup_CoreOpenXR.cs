@@ -1016,7 +1016,10 @@ namespace UnityVRMod.Features.VrVisualization
             bool leftXEdge = leftXPressed && !_wasLeftXPressed;
             bool rightAEdge = rightAPressed && !_wasRightAPressed;
             if (leftXEdge || rightAEdge)
-                _uiProjectionPlane.ToggleVisibility();
+            {
+                bool panelVisible = _uiProjectionPlane.ToggleVisibility();
+                _uiInteractor.SetUIRayVisible(panelVisible);
+            }
             _wasLeftXPressed = leftXPressed;
             _wasRightAPressed = rightAPressed;
 
