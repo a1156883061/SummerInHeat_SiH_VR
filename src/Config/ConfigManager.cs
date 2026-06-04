@@ -40,6 +40,7 @@ namespace UnityVRMod.Config
 #endif
 #if OPENXR_BUILD
         public static ConfigElement<bool> OpenXR_DisablePostFxSync;
+        public static ConfigElement<OpenXrControlHand> OpenXR_UiPanelFollowHand;
         public static ConfigElement<float> OpenXR_GripDragSensitivity;
         public static ConfigElement<float> OpenXR_UiPanelScale;
         public static ConfigElement<float> OpenXR_PanelResizeSensitivity;
@@ -167,6 +168,9 @@ namespace UnityVRMod.Config
 #if OPENXR_BUILD
             OpenXR_DisablePostFxSync = new ConfigElement<bool>("OpenXR Disable PostFX Sync",
                 "[OpenXR ONLY] If true, disables cloning of post-processing effects (Beautify, CameraFilterPack, etc.) from the game's main camera to VR eye cameras. Disable to remove blur/DOF effects in VR.", true);
+
+            OpenXR_UiPanelFollowHand = new ConfigElement<OpenXrControlHand>("OpenXR UI Panel Follow Hand",
+                "[OpenXR ONLY] Which hand the UI panel follows. Double-click Y(Left)/B(Right) to switch at runtime.", OpenXrControlHand.Left);
 
             OpenXR_GripDragSensitivity = new ConfigElement<float>("OpenXR Grip Drag Sensitivity",
                 "[OpenXR ONLY] Multiplier for Grip drag translation. Lower values reduce motion intensity and nausea.", 0.45f);

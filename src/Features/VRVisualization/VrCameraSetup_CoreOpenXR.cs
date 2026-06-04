@@ -101,8 +101,11 @@ namespace UnityVRMod.Features.VrVisualization
         private OpenXrControlHand? _uiClickHand;
         private OpenXrControlHand? _activeGripHand;
         private OpenXrControlHand? _lastActiveGripHand;
-        private bool _wasLeftXPressed;
-        private bool _wasRightAPressed;
+        private bool _wasXOrAPressed;
+        private float _lastXaPressTime = -1f;
+        private float _xaClickPendingTime = -1f;
+        private bool _wasUiTogglePressed;
+        private const float UiToggleDoubleClickWindow = 0.3f;
         private PlaneEditSelection _activePlaneEditSelection = PlaneEditSelection.None;
         private Vector3 _activePlaneEditHandLocalPos = Vector3.zero;
         private Quaternion _activePlaneEditHandLocalRot = Quaternion.identity;
@@ -956,6 +959,7 @@ namespace UnityVRMod.Features.VrVisualization
             Camera currentMainCamera = GetTrackedMainCamera();
             OpenXrControlHand activeControlHand = GetActiveControlHand();
             bool useLeftControlHand = activeControlHand == OpenXrControlHand.Left;
+            bool useLeftPanelHand = (ConfigManager.OpenXR_UiPanelFollowHand?.Value ?? OpenXrControlHand.Left) == OpenXrControlHand.Left;
             // 传送和转向始终使用右手摇杆，不受控制手配置影响
             OpenXrVector2LogState turnThumbstickState = _rightThumbstickAxisLogState;
             OpenXrBooleanLogState turnThumbstickClickState = _rightThumbstickClickLogState;
@@ -969,7 +973,11 @@ namespace UnityVRMod.Features.VrVisualization
             bool isSmoothTurnHeld = IsBooleanActionPressed(turnThumbstickClickState);
             float activeGripValue = GetFloatActionValue(activeGripState);
             bool isGripHeld = activeGripValue >= GripHoldThreshold || leftGripPressed || rightGripPressed;
-            bool isUiTogglePressed = IsBooleanActionPressed(_leftYLogState) || IsBooleanActionPressed(_rightBLogState);
+            // Y(左)/B(右) 单击：跟随/锚定切换
+            bool yOrBPressed = IsBooleanActionPressed(_leftYLogState) || IsBooleanActionPressed(_rightBLogState);
+            bool isUiTogglePressed = yOrBPressed && !_wasUiTogglePressed;
+            _wasUiTogglePressed = yOrBPressed;
+
             bool teleportConfirmPressed = rightTriggerPressed;
             float rightStickX = GetThumbstickX(_rightThumbstickAxisLogState);
             float rightStickY = GetThumbstickY(_rightThumbstickAxisLogState);
@@ -1010,16 +1018,36 @@ namespace UnityVRMod.Features.VrVisualization
                 teleportConfirmPressed = false;
             }
 
-            // X(左)/A(右) 切换 UI 面板显隐
-            bool leftXEdge = leftXPressed && !_wasLeftXPressed;
-            bool rightAEdge = rightAPressed && !_wasRightAPressed;
-            if (leftXEdge || rightAEdge)
+            // X(左)/A(右) 双击切换面板跟随手，单击切换面板显隐
+            bool xOrAPressed = leftXPressed || rightAPressed;
+            bool xOrAEdge = xOrAPressed && !_wasXOrAPressed;
+            if (xOrAEdge)
+            {
+                float sinceLast = (_lastXaPressTime > 0f) ? Time.time - _lastXaPressTime : float.MaxValue;
+                if (sinceLast < UiToggleDoubleClickWindow)
+                {
+                    // 双击：切换面板跟随手
+                    var current = ConfigManager.OpenXR_UiPanelFollowHand?.Value ?? OpenXrControlHand.Left;
+                    var next = current == OpenXrControlHand.Left ? OpenXrControlHand.Right : OpenXrControlHand.Left;
+                    VRModCore.Log($"[UI][OpenXR] Double-click X/A: switching panel follow hand to {next}");
+                    ConfigManager.OpenXR_UiPanelFollowHand!.Value = next;
+                    _xaClickPendingTime = -1f;
+                    _lastXaPressTime = -1f;
+                }
+                else
+                {
+                    _xaClickPendingTime = Time.time;
+                    _lastXaPressTime = Time.time;
+                }
+            }
+            // 窗口过期，确认是单击 → 切换显隐
+            if (_xaClickPendingTime > 0f && Time.time - _xaClickPendingTime >= UiToggleDoubleClickWindow)
             {
                 bool panelVisible = _uiProjectionPlane.ToggleVisibility();
                 _uiInteractor.SetUIRayVisible(panelVisible);
+                _xaClickPendingTime = -1f;
             }
-            _wasLeftXPressed = leftXPressed;
-            _wasRightAPressed = rightAPressed;
+            _wasXOrAPressed = xOrAPressed;
 
             bool isTeleportAiming = UpdateTeleportAimStateFromStick(turnStickY);
 
@@ -1134,11 +1162,11 @@ namespace UnityVRMod.Features.VrVisualization
             Quaternion planeEditHandWorldRot = useLeftForUi ? leftHandWorldRot : rightHandWorldRot;
             bool planeEditTriggerPressed = useLeftForUi ? leftTriggerPressed : rightTriggerPressed;
 
-            bool hasPanelPose = useLeftControlHand ? (hasLeftHandWorldPose || hasLeftAimWorldPose) : (hasRightHandWorldPose || hasRightAimWorldPose);
-            Vector3 panelWorldPos = useLeftControlHand
+            bool hasPanelPose = useLeftPanelHand ? (hasLeftHandWorldPose || hasLeftAimWorldPose) : (hasRightHandWorldPose || hasRightAimWorldPose);
+            Vector3 panelWorldPos = useLeftPanelHand
                 ? (hasLeftHandWorldPose ? leftHandWorldPos : leftAimWorldPos)
                 : (hasRightHandWorldPose ? rightHandWorldPos : rightAimWorldPos);
-            Quaternion panelWorldRot = useLeftControlHand
+            Quaternion panelWorldRot = useLeftPanelHand
                 ? (hasLeftAimWorldPose ? leftAimWorldRot : leftHandWorldRot)
                 : (hasRightAimWorldPose ? rightAimWorldRot : rightHandWorldRot);
             HandlePlaneEditInput(
@@ -3460,13 +3488,15 @@ namespace UnityVRMod.Features.VrVisualization
             _nextLookAtTargetResolveTime = 0f;
             _wasPlaneEditTogglePressed = false;
             _wasPlaneEditTriggerPressed = false;
+            _wasUiTogglePressed = false;
+            _wasXOrAPressed = false;
+            _lastXaPressTime = -1f;
+            _xaClickPendingTime = -1f;
             _wasLeftTriggerPressed = false;
             _wasRightTriggerPressed = false;
             _uiClickHand = null;
             _activeGripHand = null;
             _lastActiveGripHand = null;
-            _wasLeftXPressed = false;
-            _wasRightAPressed = false;
             _activePlaneEditSelection = PlaneEditSelection.None;
             _activePlaneEditHandLocalPos = Vector3.zero;
             _activePlaneEditHandLocalRot = Quaternion.identity;
