@@ -964,14 +964,12 @@ namespace UnityVRMod.Features.VrVisualization
             bool rightTriggerPressed = IsTriggerPressed(_rightTriggerLogState);
             bool leftGripPressed = GetFloatActionValue(_leftGripLogState) >= GripHoldThreshold;
             bool rightGripPressed = GetFloatActionValue(_rightGripLogState) >= GripHoldThreshold;
-            OpenXrBooleanLogState activeUiToggleState = useLeftControlHand ? _leftYLogState : _rightBLogState;
-
             float turnStickX = GetThumbstickX(turnThumbstickState);
             float turnStickY = GetThumbstickY(turnThumbstickState);
             bool isSmoothTurnHeld = IsBooleanActionPressed(turnThumbstickClickState);
             float activeGripValue = GetFloatActionValue(activeGripState);
             bool isGripHeld = activeGripValue >= GripHoldThreshold || leftGripPressed || rightGripPressed;
-            bool isUiTogglePressed = IsBooleanActionPressed(activeUiToggleState);
+            bool isUiTogglePressed = IsBooleanActionPressed(_leftYLogState) || IsBooleanActionPressed(_rightBLogState);
             bool teleportConfirmPressed = rightTriggerPressed;
             float rightStickX = GetThumbstickX(_rightThumbstickAxisLogState);
             float rightStickY = GetThumbstickY(_rightThumbstickAxisLogState);
