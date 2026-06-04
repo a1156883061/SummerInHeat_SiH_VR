@@ -40,29 +40,42 @@
 ## 🎮 Controls (Oculus/Meta Touch)
 
 > [!TIP]
-> `OpenXR Control Hand` can switch the primary control hand between **Right** and **Left**.
+> `OpenXR Control Hand` switches locomotion and interaction hand. `OpenXR UI Panel Follow Hand` switches which hand the UI panel follows. Double-click **X(Left)/A(Right)** to switch panel follow hand at runtime.
 
 | Action | VR Controller Input |
 | :--- | :--- |
-| **Teleport Aim** | **Primary Hand Stick** (Up) |
-| **Confirm Teleport** | **Primary Hand Trigger** |
-| **Snap Turning** | **Primary Hand Stick** (Left/Right) |
-| **Smooth Turning** | **Primary Hand Stick Click (Hold)** + Move Left/Right |
-| **Move Viewport** | **Hold Primary Hand Grip** & Drag Hand |
-| **Toggle UI Panel** | **Button B (Right Hand)** / **Button Y (Left Hand)** |
-| **Click/Select UI** | **Primary Hand Trigger** |
-| **Resize & Move UI Panel** | **Primary Hand Trigger** (on boundary) & Drag |
-| **Petting Interact** | **Touch target with Primary Hand controller** + **Primary Hand Grip** |
-| **Toggle SubCam Move Mode** | **Hold Button A (Right Hand)** |
-| **Move SubCam** | **Right Stick** (while SubCam Move Mode is ON) |
+| **Teleport Aim** | **Right Stick ↑** (always right hand) |
+| **Confirm Teleport** | **Right Trigger** (always right hand) |
+| **Snap Turning** | **Right Stick ←→** (always right hand) |
+| **Smooth Turning** | **Right Stick Click (Hold)** + Move ←→ |
+| **Move Viewport** | **Hold Grip (either hand)** & Drag |
+| **Toggle UI Anchor/Follow** | **Click Y(Left) / B(Right)** |
+| **Switch Panel Follow Hand** | **Double-click X(Left) / A(Right)** |
+| **Toggle UI Panel Visible** | **Click X(Left) / A(Right)** |
+| **Click/Select UI** | **Either Trigger** (auto-switches on first press) |
+| **Resize & Move UI Panel** | **Trigger (on boundary) & Drag** |
+| **Petting Interact** | **Grip (either hand)** + hand near target |
+| **Toggle SubCam Move Mode** | **Hold A (Right)** |
+| **Move SubCam** | **Right Stick** (while SubCam Move Mode ON) |
 | **Rotate SubCam** | **Hold Right Stick Click** + **Right Stick** |
-| **SubCam Height Step** | **Tap A (Up) / Tap B (Down)** (while SubCam Move Mode is ON) |
+| **SubCam Height Step** | **Tap A (Up) / Tap B (Down)** (SubCam Move Mode ON) |
+
+### UI Interaction
+
+- **Either trigger clicks UI**: Press trigger on left or right hand — the clicking hand is locked on first press and stays until the other hand clicks.
+- **Panel follow hand**: Double-click X(Left) or A(Right) to toggle which hand the UI panel follows. Panel position is independent of the control hand used for locomotion.
+
+### Move Viewport
+
+1. Press and hold **Grip** on either controller.
+2. Move your hand to drag the world.
+3. Release to stop.
 
 ### Petting Interaction
 
-1. Move your primary hand controller close to the target body point.
+1. Move either controller close to the target body point.
 2. When a valid target is detected, an interaction icon appears on the controller.
-3. Press **Primary Hand Grip** to trigger the interaction logic.
+3. Press **Grip** on either hand to trigger.
 
 ### SubCamera Control
 
