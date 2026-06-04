@@ -48,6 +48,7 @@
 | **Confirm Teleport** | **Right Trigger** (always right hand) |
 | **Snap Turning** | **Right Stick ←→** (always right hand) |
 | **Smooth Turning** | **Right Stick Click (Hold)** + Move ←→ |
+| **Smooth Move / Walk** | **Left Stick** (camera-relative, configurable speed) |
 | **Move Viewport** | **Hold Grip (either hand)** & Drag |
 | **Toggle UI Anchor/Follow** | **Click Y(Left) / B(Right)** |
 | **Switch Panel Follow Hand** | **Double-click X(Left) / A(Right)** |
