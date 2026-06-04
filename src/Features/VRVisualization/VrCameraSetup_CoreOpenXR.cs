@@ -979,6 +979,8 @@ namespace UnityVRMod.Features.VrVisualization
             _wasUiTogglePressed = yOrBPressed;
 
             bool teleportConfirmPressed = rightTriggerPressed;
+            float leftStickX = GetThumbstickX(_leftThumbstickAxisLogState);
+            float leftStickY = GetThumbstickY(_leftThumbstickAxisLogState);
             float rightStickX = GetThumbstickX(_rightThumbstickAxisLogState);
             float rightStickY = GetThumbstickY(_rightThumbstickAxisLogState);
             bool rightStickClickPressed = IsBooleanActionPressed(_rightThumbstickClickLogState);
@@ -1211,7 +1213,7 @@ namespace UnityVRMod.Features.VrVisualization
             _controllerVisualizer.Update(_vrRig, _vrRig.layer, hasLeftHandWorldPose, leftHandWorldPos, leftHandWorldRot, hasRightHandWorldPose, rightHandWorldPos, rightHandWorldRot, activeControlHand);
             _danmenProjectionPlane.Update(uiToggleShortPress, hasPanelPose, panelWorldPos, panelWorldRot, hasPointerPose, pointerOriginWorld, pointerDirectionWorld);
             bool locomotionTeleportConfirmPressed = teleportConfirmPressed && !isPlaneEditTriggerConsumed;
-            _locomotion.Update(_vrRig, turnStickX, isSmoothTurnHeld, isGripHeld, hasGripLocalPose, activeGripLocalPos, isTeleportAiming, locomotionTeleportConfirmPressed, hasTeleportPointer, pointerOriginWorld, pointerDirectionWorld, cameraForwardWorld, hasHmdPose, hmdWorldPos);
+            _locomotion.Update(_vrRig, turnStickX, isSmoothTurnHeld, isGripHeld, hasGripLocalPose, activeGripLocalPos, isTeleportAiming, locomotionTeleportConfirmPressed, hasTeleportPointer, pointerOriginWorld, pointerDirectionWorld, cameraForwardWorld, hasHmdPose, hmdWorldPos, leftStickX, leftStickY);
             if (!isGripHeld)
                 _activeGripHand = null;
         }

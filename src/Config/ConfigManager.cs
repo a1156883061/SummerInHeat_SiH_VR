@@ -41,6 +41,7 @@ namespace UnityVRMod.Config
 #if OPENXR_BUILD
         public static ConfigElement<bool> OpenXR_DisablePostFxSync;
         public static ConfigElement<OpenXrControlHand> OpenXR_UiPanelFollowHand;
+        public static ConfigElement<float> OpenXR_SmoothMoveSpeed;
         public static ConfigElement<float> OpenXR_GripDragSensitivity;
         public static ConfigElement<float> OpenXR_UiPanelScale;
         public static ConfigElement<float> OpenXR_PanelResizeSensitivity;
@@ -171,6 +172,9 @@ namespace UnityVRMod.Config
 
             OpenXR_UiPanelFollowHand = new ConfigElement<OpenXrControlHand>("OpenXR UI Panel Follow Hand",
                 "[OpenXR ONLY] Which hand the UI panel follows. Double-click Y(Left)/B(Right) to switch at runtime.", OpenXrControlHand.Left);
+
+            OpenXR_SmoothMoveSpeed = new ConfigElement<float>("OpenXR Smooth Move Speed",
+                "[OpenXR ONLY] Walking speed in meters per second when using the left thumbstick.", 1.5f);
 
             OpenXR_GripDragSensitivity = new ConfigElement<float>("OpenXR Grip Drag Sensitivity",
                 "[OpenXR ONLY] Multiplier for Grip drag translation. Lower values reduce motion intensity and nausea.", 0.45f);

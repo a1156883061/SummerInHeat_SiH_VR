@@ -38,6 +38,7 @@ namespace UnityVRMod.Features.VrVisualization
         private const float SnapTurnReleaseThreshold = 0.28f;
         private const float SnapTurnCooldownSeconds = 0.20f;
         private const float SmoothTurnDeadzone = 0.18f;
+        private const float SmoothMoveSpeedMetersPerSecond = 1.5f;
         private const float DefaultGripDragSensitivity = 0.45f;
         private const float GripDragDeadzoneMeters = 0.002f;
         private const float GripDragMaxStepMeters = 0.20f;
@@ -150,7 +151,9 @@ namespace UnityVRMod.Features.VrVisualization
             Vector3 pointerDirectionWorld,
             Vector3 cameraForwardWorld,
             bool hasHmdWorldPose,
-            Vector3 hmdWorldPos)
+            Vector3 hmdWorldPos,
+            float leftStickX,
+            float leftStickY)
         {
             if (vrRig == null)
             {
@@ -173,6 +176,7 @@ namespace UnityVRMod.Features.VrVisualization
             if (!isAiming)
             {
                 UpdateTurn(vrRig, rightStickX, isSmoothTurnHeld, hasHmdWorldPose, hmdWorldPos);
+                UpdateSmoothMove(vrRig, leftStickX, leftStickY, cameraForwardWorld);
             }
             UpdateGripDragTranslate(vrRig, isGripHeld, hasGripLocalPose, rightGripTrackingLocalPos);
 
@@ -372,6 +376,19 @@ namespace UnityVRMod.Features.VrVisualization
             }
         }
 
+        private void UpdateSmoothMove(GameObject vrRig, float moveX, float moveY, Vector3 cameraForward)
+        {
+            const float deadzone = 0.15f;
+            float magnitude = Mathf.Sqrt(moveX * moveX + moveY * moveY);
+            if (magnitude < deadzone) return;
+
+            float speed = magnitude * GetSmoothMoveSpeed() * Time.deltaTime;
+            Vector3 flatForward = Vector3.ProjectOnPlane(cameraForward, Vector3.up).normalized;
+            Vector3 flatRight = Vector3.Cross(Vector3.up, flatForward).normalized;
+            Vector3 move = (flatForward * moveY + flatRight * moveX).normalized * speed;
+            vrRig.transform.position += move;
+        }
+
         private void UpdateGripDragTranslate(GameObject vrRig, bool gripHeld, bool hasGripLocalPose, Vector3 currentGripTrackingLocalPos)
         {
             if (gripHeld)
@@ -453,6 +470,17 @@ namespace UnityVRMod.Features.VrVisualization
             }
 #endif
             return DefaultSnapTurnDegrees;
+        }
+
+        private static float GetSmoothMoveSpeed()
+        {
+#if OPENXR_BUILD
+            if (ConfigManager.OpenXR_SmoothMoveSpeed != null)
+            {
+                return Mathf.Clamp(ConfigManager.OpenXR_SmoothMoveSpeed.Value, 0.1f, 20f);
+            }
+#endif
+            return SmoothMoveSpeedMetersPerSecond;
         }
 
         private static float GetSmoothTurnDegreesPerSecond()
