@@ -1198,7 +1198,12 @@ namespace UnityVRMod.Features.VrVisualization
                 hasRightDebugPose,
                 rightDebugWorldPos,
                 rightDebugWorldRot);
-            bool uiTouchInteractionTriggered = _uiInteractor.UpdateUiRayTouch(_vrRig, hasActiveHandWorldPose, activeHandWorldPos, activeHandWorldRot, isGripHeld);
+            // 触摸检测手跟随 UI 射线切换（点击哪只手扳机就切换到哪只手）
+            bool hasTouchHandPose = useLeftForUi ? hasLeftHandWorldPose : hasRightHandWorldPose;
+            Vector3 touchHandPos = useLeftForUi ? leftHandWorldPos : rightHandWorldPos;
+            Quaternion touchHandRot = useLeftForUi ? leftHandWorldRot : rightHandWorldRot;
+            bool touchTriggerHeld = leftTriggerPressed || rightTriggerPressed;
+            bool uiTouchInteractionTriggered = _uiInteractor.UpdateUiRayTouch(_vrRig, hasTouchHandPose, touchHandPos, touchHandRot, touchTriggerHeld);
             if (uiTouchInteractionTriggered)
             {
                 PlayUiTouchHaptic(activeControlHand);

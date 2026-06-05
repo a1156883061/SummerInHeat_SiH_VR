@@ -1,4 +1,5 @@
 #if OPENXR_BUILD
+using System.Reflection;
 using System.Runtime.InteropServices;
 using UnityVRMod.Config;
 using UnityVRMod.Core;
@@ -80,7 +81,6 @@ namespace UnityVRMod.Features.VrVisualization
         private bool _loggedUiRayLayerFallback;
         private bool _physicsBindingsResolved;
         private bool _physicsBindingsFailed;
-        private bool _wasGripPressedForUiRayTouch;
         private bool _loggedMouseInjectionUnsupportedPlatform;
         private bool _loggedMouseInjectionWindowMissing;
         private int _uiRayLayerMask;
@@ -136,8 +136,8 @@ namespace UnityVRMod.Features.VrVisualization
         private Quaternion _subCameraRectDebugManualWorldRot;
         private Type _zngControllerType;
         private MethodInfo _zngButtonDownMethod;
-        private UnityEngine.Object _zngControllerInstance;
         private float _nextZngControllerLookupTime;
+        private UnityEngine.Object _zngControllerInstance;
         private Type _uiWidgetType;
         private Type _uiDragResizeType;
         private Component _subCameraMappingWidget;
@@ -202,7 +202,6 @@ namespace UnityVRMod.Features.VrVisualization
             _wasTriggerPressed = false;
             _pointerIsDown = false;
             _activePointerSurface = PointerSurfaceKind.None;
-            _wasGripPressedForUiRayTouch = false;
             _resolvedUiRayLayerMask = false;
             _loggedUiRayLayerFallback = false;
             _physicsBindingsResolved = false;
@@ -282,7 +281,6 @@ namespace UnityVRMod.Features.VrVisualization
             _loggedSubCameraRectFallback = false;
             _wasTriggerPressed = false;
             _activePointerSurface = PointerSurfaceKind.None;
-            _wasGripPressedForUiRayTouch = false;
             _resolvedUiRayLayerMask = false;
             _loggedUiRayLayerFallback = false;
             _physicsBindingsResolved = false;
@@ -537,22 +535,19 @@ namespace UnityVRMod.Features.VrVisualization
             return _pointerIsDown && _activePointerSurface == PointerSurfaceKind.SubCameraProjection;
         }
 
-        public bool UpdateUiRayTouch(GameObject vrRig, bool hasHandPose, Vector3 handWorldPos, Quaternion handWorldRot, bool gripPressed)
+        public bool UpdateUiRayTouch(GameObject vrRig, bool hasHandPose, Vector3 handWorldPos, Quaternion handWorldRot, bool triggerPressed)
         {
             if (vrRig == null)
             {
                 SetControllerIconVisible(false);
-                _wasGripPressedForUiRayTouch = gripPressed;
                 return false;
             }
 
             EnsureControllerIconVisual(vrRig);
-            bool gripDown = gripPressed && !_wasGripPressedForUiRayTouch;
 
             if (!hasHandPose)
             {
                 SetControllerIconVisible(false);
-                _wasGripPressedForUiRayTouch = gripPressed;
                 return false;
             }
 
@@ -560,19 +555,26 @@ namespace UnityVRMod.Features.VrVisualization
             if (!hasUiRayTouchHit)
             {
                 SetControllerIconVisible(false);
-                _wasGripPressedForUiRayTouch = gripPressed;
                 return false;
+            }
+
+            // 图标颜色：无映射=白，有映射未触发=浅绿，触发=亮绿
+            if (_controllerIconMaterial != null)
+            {
+                _controllerIconMaterial.color = mappedIconHit
+                    ? (triggerPressed ? new Color(1f, 0.7f, 0.1f, 1f) : new Color(0.2f, 0.5f, 1f, 1f))
+                    : Color.white;
             }
 
             UpdateControllerIconVisual(_fixedTouchIconTexture, handWorldPos, handWorldRot);
 
+            // 直接检查扳机 + 图标匹配，不用边沿检测
             bool triggered = false;
-            if (mappedIconHit && gripDown)
+            if (mappedIconHit && triggerPressed)
             {
                 triggered = TryInvokeZngButtonDown(icon);
             }
 
-            _wasGripPressedForUiRayTouch = gripPressed;
             return triggered;
         }
 
@@ -1523,14 +1525,11 @@ namespace UnityVRMod.Features.VrVisualization
                 {
                     bestIcon = mappedIcon;
                 }
-                else
-                {
-                    bestIcon = string.Empty;
-                }
             }
 
             hasUiRayTouchHit = foundTouch;
-            if (string.IsNullOrEmpty(bestIcon)) return false;
+            if (string.IsNullOrEmpty(bestIcon))
+                return false;
 
             icon = bestIcon;
             hitPointWorld = bestPoint;
@@ -1869,10 +1868,12 @@ namespace UnityVRMod.Features.VrVisualization
                 case "HS_anaruA00_Coll":
                     icon = "\u30A2\u30CA\u30EB";
                     return true;
+                case "HS_Breast_R00_Coll":
                 case "BP_Breast_R01_Z_Coll":
                 case "milkR_(Z)_Point":
                     icon = "\u80F8RZ";
                     return true;
+                case "HS_Breast_L00_Coll":
                 case "BP_Breast_L01_Z_Coll":
                 case "milkL_(Z)_Point":
                     icon = "\u80F8LZ";

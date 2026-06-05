@@ -60,8 +60,8 @@ namespace UnityVRMod.Features.VrVisualization
                 return;
             }
 
-            bool showLeft = activeControlHand == OpenXrControlHand.Left && hasLeftPose;
-            bool showRight = activeControlHand == OpenXrControlHand.Right && hasRightPose;
+            bool showLeft = hasLeftPose;
+            bool showRight = hasRightPose;
             UpdateControllerObject(_leftControllerObject, showLeft, leftWorldPos, leftWorldRot, LeftModelPositionOffset, LeftModelRotationOffset);
             UpdateControllerObject(_rightControllerObject, showRight, rightWorldPos, rightWorldRot, RightModelPositionOffset, RightModelRotationOffset);
         }
@@ -115,13 +115,17 @@ namespace UnityVRMod.Features.VrVisualization
             _root.transform.localRotation = Quaternion.identity;
             _root.transform.localScale = Vector3.one;
 
+            TryLoadMeshesIfNeeded();
+            bool hasObjModel = s_leftMesh != null || s_rightMesh != null;
             _leftControllerMaterial = CreateControllerMaterial(LeftControllerColor);
             _rightControllerMaterial = CreateControllerMaterial(RightControllerColor);
 
-            _leftControllerObject = CreateControllerObject("OpenXR_LeftControllerModel", _leftControllerMaterial, vrRigLayer);
-            _rightControllerObject = CreateControllerObject("OpenXR_RightControllerModel", _rightControllerMaterial, vrRigLayer);
+            _leftControllerObject = CreateControllerObject("OpenXR_LeftControllerModel", _leftControllerMaterial, vrRigLayer, s_leftMesh);
+            _rightControllerObject = CreateControllerObject("OpenXR_RightControllerModel", _rightControllerMaterial, vrRigLayer, s_rightMesh);
 
-            VRModCore.Log("[OpenXR][ControllerModel] Using simple sphere visuals for left/right controllers.");
+            VRModCore.Log(hasObjModel
+                ? "[OpenXR][ControllerModel] Using OBJ controller models for left/right controllers."
+                : "[OpenXR][ControllerModel] OBJ models not found, using procedural capsule fallback.");
         }
 
         private void UpdateControllerObject(
@@ -155,31 +159,69 @@ namespace UnityVRMod.Features.VrVisualization
             targetObject.transform.rotation = worldRot * rotationOffset;
         }
 
-        private GameObject CreateControllerObject(string objectName, Material material, int vrRigLayer)
+        private GameObject CreateControllerObject(string objectName, Material material, int vrRigLayer, Mesh mesh)
         {
-            GameObject go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            go.name = objectName;
+            GameObject go;
+            if (mesh != null)
+            {
+                go = new GameObject(objectName);
+                var mf = go.AddComponent<MeshFilter>();
+                mf.sharedMesh = mesh;
+                var mr = go.AddComponent<MeshRenderer>();
+                mr.shadowCastingMode = ShadowCastingMode.Off;
+                mr.receiveShadows = false;
+                mr.sharedMaterial = material;
+            }
+            else
+            {
+                go = CreateProceduralController(objectName, material);
+            }
             go.transform.SetParent(_root.transform, false);
             go.transform.localPosition = Vector3.zero;
             go.transform.localRotation = Quaternion.identity;
-            go.transform.localScale = Vector3.one * ControllerSphereDiameterMeters;
             SetLayerRecursively(go, vrRigLayer);
+            return go;
+        }
 
+        private static GameObject CreateProceduralController(string name, Material material)
+        {
+            var root = new GameObject(name);
+            // 手柄主体：胶囊体
+            var body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            body.name = "Body";
+            body.transform.SetParent(root.transform, false);
+            body.transform.localPosition = Vector3.zero;
+            body.transform.localRotation = Quaternion.identity;
+            body.transform.localScale = new Vector3(0.03f, 0.05f, 0.03f);
+            DestroyCollider(body);
+            ApplyMaterial(body, material);
+            // 追踪环：圆环（用缩放压扁的环体模拟）
+            var ring = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            ring.name = "Ring";
+            ring.transform.SetParent(root.transform, false);
+            ring.transform.localPosition = new Vector3(0f, 0.045f, 0f);
+            ring.transform.localRotation = Quaternion.identity;
+            ring.transform.localScale = new Vector3(0.035f, 0.008f, 0.035f);
+            DestroyCollider(ring);
+            ApplyMaterial(ring, material);
+            return root;
+        }
+
+        private static void DestroyCollider(GameObject go)
+        {
             var col = go.GetComponent("Collider");
-            if (col != null)
-            {
-                UnityEngine.Object.Destroy(col);
-            }
+            if (col != null) UnityEngine.Object.Destroy(col);
+        }
 
-            Renderer renderer = go.GetComponent<Renderer>();
+        private static void ApplyMaterial(GameObject go, Material material)
+        {
+            var renderer = go.GetComponent<Renderer>();
             if (renderer != null)
             {
                 renderer.shadowCastingMode = ShadowCastingMode.Off;
                 renderer.receiveShadows = false;
                 renderer.sharedMaterial = material;
             }
-
-            return go;
         }
 
         private static Material CreateControllerMaterial(Color color)

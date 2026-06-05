@@ -440,10 +440,10 @@ namespace UnityVRMod.Features.VrVisualization
         {
             if (_vrRig == null) return null;
 
-            GameObject marker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            GameObject marker = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             marker.name = markerName;
             marker.transform.SetParent(_vrRig.transform, false);
-            marker.transform.localScale = Vector3.one * 0.06f;
+            marker.transform.localScale = new Vector3(0.04f, 0.06f, 0.04f);
 
             var collider = marker.GetComponent("Collider");
             if (collider != null) UnityEngine.Object.Destroy(collider);
