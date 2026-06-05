@@ -55,7 +55,7 @@
 | **Toggle UI Panel Visible** | **Click X(Left) / A(Right)** |
 | **Click/Select UI** | **Either Trigger** (auto-switches on first press) |
 | **Resize & Move UI Panel** | **Trigger (on boundary) & Drag** |
-| **Petting Interact** | **Grip (either hand)** + hand near target |
+| **Petting Interact** | **Trigger (either hand)** + hand near target |
 | **Toggle SubCam Move Mode** | **Hold A (Right)** |
 | **Move SubCam** | **Right Stick** (while SubCam Move Mode ON) |
 | **Rotate SubCam** | **Hold Right Stick Click** + **Right Stick** |
@@ -75,8 +75,9 @@
 ### Petting Interaction
 
 1. Move either controller close to the target body point.
-2. When a valid target is detected, an interaction icon appears on the controller.
-3. Press **Grip** on either hand to trigger.
+2. When a valid target is detected, the icon turns **blue**.
+3. Press **Trigger** to interact — the icon turns **orange**.
+4. Only works in free mode.
 
 ### SubCamera Control
 
