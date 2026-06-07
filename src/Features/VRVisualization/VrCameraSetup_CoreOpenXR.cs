@@ -413,7 +413,6 @@ namespace UnityVRMod.Features.VrVisualization
 
                 int bindingSize = Marshal.SizeOf<XrActionSuggestedBinding>();
 
-                ulong touchControllerProfile = StringToPath("/interaction_profiles/oculus/touch_controller");
                 ulong leftTriggerValue = StringToPath("/user/hand/left/input/trigger/value");
                 ulong rightTriggerValue = StringToPath("/user/hand/right/input/trigger/value");
                 ulong leftGripValue = StringToPath("/user/hand/left/input/squeeze/value");
@@ -433,7 +432,7 @@ namespace UnityVRMod.Features.VrVisualization
                 ulong rightAimPose = StringToPath("/user/hand/right/input/aim/pose");
                 ulong rightGripPose = StringToPath("/user/hand/right/input/grip/pose");
 
-                XrActionSuggestedBinding[] touchBindings =
+                XrActionSuggestedBinding[] bindings =
                 [
                     new XrActionSuggestedBinding { action = _triggerValueAction, binding = leftTriggerValue },
                     new XrActionSuggestedBinding { action = _triggerValueAction, binding = rightTriggerValue },
@@ -455,27 +454,91 @@ namespace UnityVRMod.Features.VrVisualization
                     new XrActionSuggestedBinding { action = _rightGripPoseAction, binding = rightGripPose }
                 ];
 
-                pSuggestedBindings = Marshal.AllocHGlobal(bindingSize * touchBindings.Length);
-                for (int i = 0; i < touchBindings.Length; i++)
+                // Valve Index 左右手均有 A/B 按钮（无 X/Y），额外绑定补全：
+                //  左手 A→X, 左手 B→Y, 右手 A/B 已由标准绑定覆盖
+                XrActionSuggestedBinding[] indexExtraBindings =
+                [
+                    new XrActionSuggestedBinding { action = _xClickAction, binding = StringToPath("/user/hand/left/input/a/click") },
+                    new XrActionSuggestedBinding { action = _yClickAction, binding = StringToPath("/user/hand/left/input/b/click") }
+                ];
+
+                pSuggestedBindings = Marshal.AllocHGlobal(bindingSize * bindings.Length);
+                for (int i = 0; i < bindings.Length; i++)
                 {
-                    Marshal.StructureToPtr(touchBindings[i], pSuggestedBindings + (i * bindingSize), false);
+                    Marshal.StructureToPtr(bindings[i], pSuggestedBindings + (i * bindingSize), false);
                 }
 
-                var touchSuggestedBindingInfo = new XrInteractionProfileSuggestedBinding
+                // Valve Index 专用绑定（额外 + 左手 A → X）
+                XrActionSuggestedBinding[] indexBindings = new XrActionSuggestedBinding[bindings.Length + indexExtraBindings.Length];
+                bindings.CopyTo(indexBindings, 0);
+                indexExtraBindings.CopyTo(indexBindings, bindings.Length);
+                IntPtr pIndexBindings = Marshal.AllocHGlobal(bindingSize * indexBindings.Length);
+                for (int i = 0; i < indexBindings.Length; i++)
                 {
-                    type = XrStructureType.XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING,
-                    interactionProfile = touchControllerProfile,
-                    countSuggestedBindings = (uint)touchBindings.Length,
-                    suggestedBindings = pSuggestedBindings
-                };
-                XrResult touchSuggestResult = OpenXRAPI.xrSuggestInteractionProfileBindings(_xrInstance, in touchSuggestedBindingInfo);
-                if (touchSuggestResult < 0)
-                {
-                    VRModCore.LogWarning($"[Input][OpenXR] Touch profile binding suggestion failed: {touchSuggestResult}");
+                    Marshal.StructureToPtr(indexBindings[i], pIndexBindings + (i * bindingSize), false);
                 }
-                else
+
+                // === 控制器交互配置文件绑定 ===
+                // Action 是抽象的概念（如 "x_click"），不绑定到特定硬件。
+                // 此处向 OpenXR 运行时声明每个控制器配置文件上 action 与物理输入的对应关系。
+                // 路径相同的配置文件共用绑定列表，Index 因左右手均只有 A/B 需额外映射。
+
+                // 标准控制器（均具有 thumbstick + A/B/X/Y 完整按键）
+                string[] standardProfiles =
+                [
+                    "/interaction_profiles/oculus/touch_controller",            // Quest 2/3
+                    "/interaction_profiles/bytedance/pico_neo3_controller",     // Pico Neo 3
+                    "/interaction_profiles/bytedance/pico4_controller",         // Pico 4
+                    "/interaction_profiles/htc/vive_cosmos_controller"          // HTC Vive Cosmos
+                ];
+
+                foreach (string profilePath in standardProfiles)
                 {
-                    VRModCore.Log("[Input][OpenXR] Touch profile bindings suggested.");
+                    ulong profile = StringToPath(profilePath);
+                    var suggestInfo = new XrInteractionProfileSuggestedBinding
+                    {
+                        type = XrStructureType.XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING,
+                        interactionProfile = profile,
+                        countSuggestedBindings = (uint)bindings.Length,
+                        suggestedBindings = pSuggestedBindings
+                    };
+                    XrResult result = OpenXRAPI.xrSuggestInteractionProfileBindings(_xrInstance, in suggestInfo);
+                    if (result < 0 && result != XrResult.XR_ERROR_PATH_UNSUPPORTED)
+                        VRModCore.LogWarning($"[Input][OpenXR] Profile binding failed for {profilePath}: {result}");
+                    else
+                        VRModCore.Log($"[Input][OpenXR] Bindings suggested: {profilePath}");
+                }
+
+                // Valve Index（左右手均只有 A/B，无 X/Y）
+                {
+                    ulong indexProfile = StringToPath("/interaction_profiles/valve/index_controller");
+                    var suggestInfo = new XrInteractionProfileSuggestedBinding
+                    {
+                        type = XrStructureType.XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING,
+                        interactionProfile = indexProfile,
+                        countSuggestedBindings = (uint)indexBindings.Length,
+                        suggestedBindings = pIndexBindings
+                    };
+                    XrResult result = OpenXRAPI.xrSuggestInteractionProfileBindings(_xrInstance, in suggestInfo);
+                    if (result < 0 && result != XrResult.XR_ERROR_PATH_UNSUPPORTED)
+                        VRModCore.LogWarning($"[Input][OpenXR] Index profile binding failed: {result}");
+                    else
+                        VRModCore.Log("[Input][OpenXR] Bindings suggested: Valve Index (left A/B → X/Y).");
+                }
+
+                // 通用兜底：null profile 为标准路径（X/Y/A/B）提供默认映射
+                // 任何未在上面明确注册的控制器均通过此绑定工作
+                {
+                    var suggestInfo = new XrInteractionProfileSuggestedBinding
+                    {
+                        type = XrStructureType.XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING,
+                        interactionProfile = OpenXRConstants.XR_NULL_PATH,
+                        countSuggestedBindings = (uint)bindings.Length,
+                        suggestedBindings = pSuggestedBindings
+                    };
+                    XrResult result = OpenXRAPI.xrSuggestInteractionProfileBindings(_xrInstance, in suggestInfo);
+                    if (result >= 0)
+                        VRModCore.Log("[Input][OpenXR] Bindings suggested: null profile (fallback for unknown controllers).");
                 }
 
                 pActionSets = Marshal.AllocHGlobal(sizeof(ulong));
