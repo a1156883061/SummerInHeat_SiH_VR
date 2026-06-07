@@ -17,6 +17,7 @@ namespace UnityVRMod.Core
         public const string AUTHOR = "New Unity Modder";
 
         public static IVRModLoader Loader { get; private set; }
+        private static bool _autoVrRequested;
 
         internal static Features.VrVisualization.VrVisualizationManager VrVisualizationFeature { get; private set; }
 
@@ -28,6 +29,11 @@ namespace UnityVRMod.Core
                 return;
             }
             Loader = loader;
+
+            // --vr 命令行参数：启动后自动进入 VR
+            string[] args = Environment.GetCommandLineArgs();
+            for (int i = 0; i < args.Length; i++)
+                if (args[i] == "--vr") { _autoVrRequested = true; break; }
 
             Log($"{MOD_NAME} {VERSION} initializing...");
 
@@ -81,6 +87,13 @@ namespace UnityVRMod.Core
         {
             try
             {
+                // --vr 自动进入 VR（延迟到 VR 模块就绪后）
+                if (_autoVrRequested && VrVisualizationFeature != null)
+                {
+                    _autoVrRequested = false;
+                    VrVisualizationFeature.ToggleUserSafeMode();
+                    Log("Auto-entering VR mode (--vr flag).");
+                }
                 VRModKeybind.Update();
                 VrVisualizationFeature?.Update();
                 TemporaryLiveReloadTester.Update();
