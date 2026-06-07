@@ -1,4 +1,5 @@
 #if OPENXR_BUILD
+using UnityVRMod.Config;
 using UnityVRMod.Core;
 
 namespace UnityVRMod.Features.VrVisualization
@@ -178,8 +179,20 @@ namespace UnityVRMod.Features.VrVisualization
 
             if (_isPanelAnchoredToRig && _vrRig != null)
             {
-                Vector3 anchoredWorldPos = _vrRig.transform.TransformPoint(_anchoredLocalPos);
-                Quaternion anchoredWorldRot = _vrRig.transform.rotation * _anchoredLocalRot;
+                Vector3 anchoredWorldPos;
+                Quaternion anchoredWorldRot;
+                if (IsWorldAnchorMode())
+                {
+                    // 世界固定模式：直接使用保存的世界坐标
+                    anchoredWorldPos = _anchoredLocalPos;
+                    anchoredWorldRot = _anchoredLocalRot;
+                }
+                else
+                {
+                    // Rig 跟随模式：将局部坐标转换回世界坐标
+                    anchoredWorldPos = _vrRig.transform.TransformPoint(_anchoredLocalPos);
+                    anchoredWorldRot = _vrRig.transform.rotation * _anchoredLocalRot;
+                }
 #if MONO
                 _plane.transform.position = anchoredWorldPos;
                 _plane.transform.rotation = anchoredWorldRot;
@@ -257,7 +270,8 @@ namespace UnityVRMod.Features.VrVisualization
             if (_isPanelAnchoredToRig)
             {
                 CaptureAnchoredPoseFromCurrent();
-                VRModCore.Log("[Danmen][OpenXR] Panel mode: Anchored (follows rig movement, not controller).");
+                string anchorDesc = IsWorldAnchorMode() ? "fixed in world" : "follows rig movement";
+                VRModCore.Log($"[Danmen][OpenXR] Panel mode: Anchored ({anchorDesc}).");
             }
             else
             {
@@ -265,12 +279,27 @@ namespace UnityVRMod.Features.VrVisualization
             }
         }
 
+        private static bool IsWorldAnchorMode()
+        {
+            return (ConfigManager.OpenXR_UiPanelAnchorMode?.Value ?? UiPanelAnchorMode.World) == UiPanelAnchorMode.World;
+        }
+
         private void CaptureAnchoredPoseFromCurrent()
         {
             if (_vrRig == null || _plane == null) return;
 
-            _anchoredLocalPos = _vrRig.transform.InverseTransformPoint(_plane.transform.position);
-            _anchoredLocalRot = Quaternion.Inverse(_vrRig.transform.rotation) * _plane.transform.rotation;
+            if (IsWorldAnchorMode())
+            {
+                // 世界固定模式：保存世界坐标，面板不跟随 VR Rig 移动
+                _anchoredLocalPos = _plane.transform.position;
+                _anchoredLocalRot = _plane.transform.rotation;
+            }
+            else
+            {
+                // Rig 跟随模式：保存相对于 VR Rig 的局部坐标（旧行为）
+                _anchoredLocalPos = _vrRig.transform.InverseTransformPoint(_plane.transform.position);
+                _anchoredLocalRot = Quaternion.Inverse(_vrRig.transform.rotation) * _plane.transform.rotation;
+            }
         }
 
         private void CreatePlane()

@@ -41,6 +41,7 @@ namespace UnityVRMod.Config
 #if OPENXR_BUILD
         public static ConfigElement<bool> OpenXR_DisablePostFxSync;
         public static ConfigElement<bool> OpenXR_ForceUiOnTop;
+        public static ConfigElement<UiPanelAnchorMode> OpenXR_UiPanelAnchorMode;
         public static ConfigElement<OpenXrControlHand> OpenXR_UiPanelFollowHand;
         public static ConfigElement<float> OpenXR_SmoothMoveSpeed;
         public static ConfigElement<float> OpenXR_GripDragSensitivity;
@@ -173,6 +174,9 @@ namespace UnityVRMod.Config
 
             OpenXR_ForceUiOnTop = new ConfigElement<bool>("OpenXR Force UI On Top",
                 "[OpenXR ONLY] If true, uses an overlay camera to render VR UI panels (main panel, Danmen, SubCamera) on top of all scene geometry so they are never occluded by characters or objects.", true);
+
+            OpenXR_UiPanelAnchorMode = new ConfigElement<UiPanelAnchorMode>("OpenXR UI Panel Anchor Mode",
+                "[OpenXR ONLY] Controls anchor behavior when panel is toggled (Y/B click). World: panel stays fixed at its world position, unaffected by locomotion or grip drag. Rig: panel moves with the VR rig (old behavior).", UiPanelAnchorMode.World);
 
             OpenXR_UiPanelFollowHand = new ConfigElement<OpenXrControlHand>("OpenXR UI Panel Follow Hand",
                 "[OpenXR ONLY] Which hand the UI panel follows. Double-click Y(Left)/B(Right) to switch at runtime.", OpenXrControlHand.Left);

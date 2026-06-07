@@ -2145,7 +2145,8 @@ namespace UnityVRMod.Features.VrVisualization
                 }
 
                 CaptureSubCameraRectDebugPlaneAnchoredPose(vrRig);
-                VRModCore.Log("[SubCamera][OpenXR] Panel mode: Anchored (follows rig movement, not controller).");
+                string anchorDesc = IsWorldAnchorMode() ? "fixed in world" : "follows rig movement";
+                VRModCore.Log($"[SubCamera][OpenXR] Panel mode: Anchored ({anchorDesc}).");
             }
             else
             {
@@ -2153,12 +2154,27 @@ namespace UnityVRMod.Features.VrVisualization
             }
         }
 
+        private static bool IsWorldAnchorMode()
+        {
+            return (ConfigManager.OpenXR_UiPanelAnchorMode?.Value ?? UiPanelAnchorMode.World) == UiPanelAnchorMode.World;
+        }
+
         private void CaptureSubCameraRectDebugPlaneAnchoredPose(GameObject vrRig)
         {
             if (vrRig == null || _subCameraRectDebugPlaneObject == null) return;
 
-            _subCameraRectDebugPlaneAnchoredLocalPos = vrRig.transform.InverseTransformPoint(_subCameraRectDebugPlaneObject.transform.position);
-            _subCameraRectDebugPlaneAnchoredLocalRot = Quaternion.Inverse(vrRig.transform.rotation) * _subCameraRectDebugPlaneObject.transform.rotation;
+            if (IsWorldAnchorMode())
+            {
+                // 世界固定模式：保存世界坐标，面板不跟随 VR Rig 移动
+                _subCameraRectDebugPlaneAnchoredLocalPos = _subCameraRectDebugPlaneObject.transform.position;
+                _subCameraRectDebugPlaneAnchoredLocalRot = _subCameraRectDebugPlaneObject.transform.rotation;
+            }
+            else
+            {
+                // Rig 跟随模式：保存相对于 VR Rig 的局部坐标（旧行为）
+                _subCameraRectDebugPlaneAnchoredLocalPos = vrRig.transform.InverseTransformPoint(_subCameraRectDebugPlaneObject.transform.position);
+                _subCameraRectDebugPlaneAnchoredLocalRot = Quaternion.Inverse(vrRig.transform.rotation) * _subCameraRectDebugPlaneObject.transform.rotation;
+            }
         }
 
         private void UpdateSubCameraRectDebugVisuals(
@@ -2185,8 +2201,18 @@ namespace UnityVRMod.Features.VrVisualization
             else if (_isSubCameraRectDebugPlaneAnchoredToRig)
             {
                 hasPose = true;
-                planeWorldPos = vrRig.transform.TransformPoint(_subCameraRectDebugPlaneAnchoredLocalPos);
-                planeWorldRot = vrRig.transform.rotation * _subCameraRectDebugPlaneAnchoredLocalRot;
+                if (IsWorldAnchorMode())
+                {
+                    // 世界固定模式：直接使用保存的世界坐标
+                    planeWorldPos = _subCameraRectDebugPlaneAnchoredLocalPos;
+                    planeWorldRot = _subCameraRectDebugPlaneAnchoredLocalRot;
+                }
+                else
+                {
+                    // Rig 跟随模式：将局部坐标转换回世界坐标
+                    planeWorldPos = vrRig.transform.TransformPoint(_subCameraRectDebugPlaneAnchoredLocalPos);
+                    planeWorldRot = vrRig.transform.rotation * _subCameraRectDebugPlaneAnchoredLocalRot;
+                }
             }
             else
             {
