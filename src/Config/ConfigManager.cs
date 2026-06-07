@@ -40,6 +40,7 @@ namespace UnityVRMod.Config
 #endif
 #if OPENXR_BUILD
         public static ConfigElement<bool> OpenXR_DisablePostFxSync;
+        public static ConfigElement<bool> OpenXR_ForceUiOnTop;
         public static ConfigElement<OpenXrControlHand> OpenXR_UiPanelFollowHand;
         public static ConfigElement<float> OpenXR_SmoothMoveSpeed;
         public static ConfigElement<float> OpenXR_GripDragSensitivity;
@@ -169,6 +170,9 @@ namespace UnityVRMod.Config
 #if OPENXR_BUILD
             OpenXR_DisablePostFxSync = new ConfigElement<bool>("OpenXR Disable PostFX Sync",
                 "[OpenXR ONLY] If true, disables cloning of post-processing effects (Beautify, CameraFilterPack, etc.) from the game's main camera to VR eye cameras. Disable to remove blur/DOF effects in VR.", true);
+
+            OpenXR_ForceUiOnTop = new ConfigElement<bool>("OpenXR Force UI On Top",
+                "[OpenXR ONLY] If true, uses an overlay camera to render VR UI panels (main panel, Danmen, SubCamera) on top of all scene geometry so they are never occluded by characters or objects.", true);
 
             OpenXR_UiPanelFollowHand = new ConfigElement<OpenXrControlHand>("OpenXR UI Panel Follow Hand",
                 "[OpenXR ONLY] Which hand the UI panel follows. Double-click Y(Left)/B(Right) to switch at runtime.", OpenXrControlHand.Left);

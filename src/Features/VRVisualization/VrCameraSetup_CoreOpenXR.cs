@@ -41,6 +41,8 @@ namespace UnityVRMod.Features.VrVisualization
         private GameObject _rightVrCameraGO = null;
         private Camera _leftVrHdrEffectCamera = null;
         private Camera _rightVrHdrEffectCamera = null;
+        private Camera _vrUiOverlayCamera = null;
+        private GameObject _vrUiOverlayCameraGO = null;
         private readonly Dictionary<Camera, List<Component>> _syncedPostFxComponents = [];
         private readonly HashSet<int> _renderOverrideEyeRetoggledCameraIds = [];
 
@@ -912,12 +914,24 @@ namespace UnityVRMod.Features.VrVisualization
             bool originalInvertCulling = GL.invertCulling;
             GL.invertCulling = true;
             currentEyeCamera.Render();
+            GL.invertCulling = originalInvertCulling;
+
+            // 非 2D 合成模式下，使用 Overlay Camera 渲染 Layer 31（VR UI 层），
+            // 确保 UI 面板始终显示在场景物体前面，不受深度测试影响。
+            if (!_isUsing2dSyntheticFallbackCamera && _vrUiOverlayCamera != null)
+            {
+                _vrUiOverlayCamera.targetTexture = currentIntermediateRT;
+                _vrUiOverlayCamera.enabled = true;
+                CopyVrCameraTransform(currentEyeCamera, _vrUiOverlayCamera);
+                _vrUiOverlayCamera.Render();
+                _vrUiOverlayCamera.enabled = false;
+            }
+
             if (EnableOpenXrPostFxSync && !(ConfigManager.OpenXR_DisablePostFxSync?.Value == true))
             {
                 RenderHdrEffectCameraForEye(eyeIndex, currentEyeCamera, currentIntermediateRT);
             }
             currentEyeCamera.enabled = false;
-            GL.invertCulling = originalInvertCulling;
             Graphics.ExecuteCommandBuffer(_flushCommandBuffer);
             RenderTexture.active = null;
 
@@ -2206,6 +2220,7 @@ namespace UnityVRMod.Features.VrVisualization
             _uiProjectionPlane.Initialize(_vrRig, mainCamera);
             _uiInteractor.Initialize(mainCamera);
             _danmenProjectionPlane.Initialize(_vrRig);
+            CreateVrUiOverlayCamera();
             VRModCore.Log($"[UI][OpenXR] UI projection + ray interactor enabled (PrimaryHand={GetActiveControlHand()}, Trigger=UI click, Toggle={(GetActiveControlHand() == OpenXrControlHand.Left ? "Y(Left)" : "B(Right)")}).");
             if (_isUsing2dSyntheticFallbackCamera)
             {
@@ -2263,15 +2278,23 @@ namespace UnityVRMod.Features.VrVisualization
             {
                 vrCam.clearFlags = CameraClearFlags.SolidColor;
                 vrCam.backgroundColor = VrRigClearColor;
+                // 2D 合成模式：无场景内容，VR Camera 直接渲染 Layer 31 的 UI 投影面板
                 vrCam.cullingMask = GetVrRigLayerMask();
                 return;
             }
+
+            // 正常 3D 场景：如果 Overlay Camera 存在，VR Camera 渲染场景层（0-30），
+            // 排除 Layer 31（由 Overlay Camera 单独渲染以确保 UI 始终在前）；
+            // 如果 Overlay Camera 未创建（配置禁用），则 VR Camera 照常包含 Layer 31。
+            int sceneCullingMask = _vrUiOverlayCamera != null
+                ? _mainCameraCullingMask & ~GetVrRigLayerMask()
+                : _mainCameraCullingMask | GetVrRigLayerMask();
 
             if (_isUsingForcedDefaultRenderState)
             {
                 vrCam.clearFlags = CameraClearFlags.SolidColor;
                 vrCam.backgroundColor = VrRigClearColor;
-                vrCam.cullingMask = _mainCameraCullingMask | GetVrRigLayerMask();
+                vrCam.cullingMask = sceneCullingMask;
                 return;
             }
 
@@ -2279,12 +2302,12 @@ namespace UnityVRMod.Features.VrVisualization
             {
                 vrCam.clearFlags = CameraClearFlags.SolidColor;
                 vrCam.backgroundColor = VrRigClearColor;
-                vrCam.cullingMask = _mainCameraCullingMask | GetVrRigLayerMask();
+                vrCam.cullingMask = sceneCullingMask;
                 return;
             }
 
             vrCam.clearFlags = _mainCameraClearFlags;
-            vrCam.cullingMask = _mainCameraCullingMask | GetVrRigLayerMask();
+            vrCam.cullingMask = sceneCullingMask;
             if (_mainCameraClearFlags == CameraClearFlags.SolidColor)
             {
                 vrCam.backgroundColor = _mainCameraBackgroundColor;
@@ -2294,6 +2317,54 @@ namespace UnityVRMod.Features.VrVisualization
         private bool ShouldUseFallbackRenderState()
         {
             return _isUsing2dSyntheticFallbackCamera || _isUsingForcedDefaultRenderState;
+        }
+
+        private static void CopyVrCameraTransform(Camera source, Camera target)
+        {
+            if (source == null || target == null) return;
+#if MONO
+            target.transform.position = source.transform.position;
+            target.transform.rotation = source.transform.rotation;
+#elif CPP
+            target.transform.SetPositionAndRotation(source.transform.position, source.transform.rotation);
+#endif
+            target.fieldOfView = source.fieldOfView;
+            target.nearClipPlane = source.nearClipPlane;
+            target.farClipPlane = source.farClipPlane;
+            target.projectionMatrix = source.projectionMatrix;
+        }
+
+        /// <summary>
+        /// 创建独立的 Overlay Camera 渲染 VR UI 层（Layer 31），确保 UI 始终显示在最前面不被场景物体遮挡。
+        /// Overlay Camera 使用 Depth 清除模式，渲染前清空深度缓冲，使所有 UI 元素通过深度测试。
+        /// </summary>
+        private void CreateVrUiOverlayCamera()
+        {
+            if (_vrRig == null) return;
+
+            bool forceUiOnTop = ConfigManager.OpenXR_ForceUiOnTop?.Value ?? true;
+            if (!forceUiOnTop)
+            {
+                VRModCore.Log("[UI][OpenXR] Force UI On Top is disabled. UI panels may be occluded by scene geometry.");
+                return;
+            }
+
+            _vrUiOverlayCameraGO = new GameObject("XrVrUiOverlayCamera");
+            _vrUiOverlayCameraGO.transform.SetParent(_vrRig.transform, false);
+            _vrUiOverlayCamera = _vrUiOverlayCameraGO.AddComponent<Camera>();
+
+            // 复制 VR 主摄像机的关键属性
+            _vrUiOverlayCamera.enabled = false;
+            _vrUiOverlayCamera.stereoTargetEye = StereoTargetEyeMask.None;
+            _vrUiOverlayCamera.clearFlags = CameraClearFlags.Depth;
+            _vrUiOverlayCamera.backgroundColor = Color.clear;
+            _vrUiOverlayCamera.cullingMask = GetVrRigLayerMask();
+            _vrUiOverlayCamera.allowHDR = false;
+            _vrUiOverlayCamera.allowMSAA = false;
+            _vrUiOverlayCamera.allowDynamicResolution = false;
+            _vrUiOverlayCamera.useOcclusionCulling = false;
+
+            VRModCore.Log("[UI][OpenXR] VR UI overlay camera created (Layer 31, DepthOnly clear).");
         }
 
         private void RefreshForceDefaultRenderScenesCacheIfNeeded()
@@ -3490,6 +3561,8 @@ namespace UnityVRMod.Features.VrVisualization
             if (_vrRig != null) { UnityEngine.Object.Destroy(_vrRig); _vrRig = null; }
             _leftVrCameraGO = null; _leftVrCamera = null; _rightVrCameraGO = null; _rightVrCamera = null;
             _leftVrHdrEffectCamera = null; _rightVrHdrEffectCamera = null;
+            if (_vrUiOverlayCameraGO != null) { UnityEngine.Object.Destroy(_vrUiOverlayCameraGO); }
+            _vrUiOverlayCameraGO = null; _vrUiOverlayCamera = null;
             _currentlyTrackedOriginalCameraGO = null;
             _mainCameraLookAtTarget = null;
             _nextLookAtTargetResolveTime = 0f;
