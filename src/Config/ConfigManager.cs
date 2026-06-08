@@ -23,6 +23,7 @@ namespace UnityVRMod.Config
         public static ConfigElement<float> VrCameraNearClipPlane;
         public static ConfigElement<float> VrWorldScale;
         public static ConfigElement<float> VrUserEyeHeightOffset;
+        public static ConfigElement<bool> VrRigFollowsGameCamera;
         public static ConfigElement<string> ScenePoseOverrides;
         public static ConfigElement<string> DisableVrRigScenes;
 
@@ -131,6 +132,9 @@ namespace UnityVRMod.Config
             VrUserEyeHeightOffset = new ConfigElement<float>("User Eye Height Offset",
                 "How much taller (+) or shorter (-) you want to feel in the virtual world (in meters). This value is scaled by World Scale.", 0.0f);
             VrUserEyeHeightOffset.OnValueChanged += value => VRModCore.VrVisualizationFeature?.LiveUpdateUserEyeHeightOffset(value);
+
+            VrRigFollowsGameCamera = new ConfigElement<bool>("VR Rig Follows Game Camera",
+                "If true, moves the VR rig by the original game's main camera position/yaw delta each frame so scripted camera motion and view changes are reflected in VR.", true);
 
             ScenePoseOverrides = new ConfigElement<string>("Scene-Specific Pose Overrides",
                 "Defines a starting position and, optionally, rotation for the VR rig in specific scenes. Format: 'SceneName|X Y Z|Pitch Yaw Roll;'. Use '~' to keep a game's original value for any axis.", "");

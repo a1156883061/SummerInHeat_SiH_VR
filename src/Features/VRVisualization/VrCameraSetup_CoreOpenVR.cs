@@ -32,6 +32,7 @@ namespace UnityVRMod.Features.VrVisualization
         private RenderTexture _rightEyeTexture = null;
         private ETextureType _vrTextureType = ETextureType.DirectX;
         private static CommandBuffer _flushCommandBuffer;
+        private readonly GameCameraRigFollowState _gameCameraRigFollow = new();
         private ControllerLogState _leftControllerLogState;
         private ControllerLogState _rightControllerLogState;
         private readonly OpenVrRigLocomotion _locomotion = new();
@@ -204,6 +205,7 @@ namespace UnityVRMod.Features.VrVisualization
                 targetRotation = Quaternion.Euler(finalRot);
             }
             _vrRig.transform.SetPositionAndRotation(targetPosition, targetRotation);
+            _gameCameraRigFollow.Reset(mainCamera);
 
             _currentAppliedRigScale = 1.0f / Mathf.Max(0.01f, ConfigManager.VrWorldScale.Value);
             _vrRig.transform.localScale = new Vector3(_currentAppliedRigScale, _currentAppliedRigScale, _currentAppliedRigScale);
@@ -300,6 +302,7 @@ namespace UnityVRMod.Features.VrVisualization
                 Camera currentMainCamera = _currentlyTrackedOriginalCameraGO != null
                     ? _currentlyTrackedOriginalCameraGO.GetComponent<Camera>()
                     : null;
+                ApplyGameCameraRigFollow(currentMainCamera);
                 RefreshSceneCameraSuppressionIfNeeded(currentMainCamera, force: false);
                 _uiProjectionPlane.Update(currentMainCamera, _hmd, _trackedPoses);
                 _uiInteractor.Update(_hmd, _vrRig, _trackedPoses);
@@ -313,6 +316,17 @@ namespace UnityVRMod.Features.VrVisualization
             {
                 VRModCore.LogError("UpdatePoses EXCEPTION:", e);
             }
+        }
+
+        private void ApplyGameCameraRigFollow(Camera currentMainCamera)
+        {
+            if (!ConfigManager.VrRigFollowsGameCamera.Value)
+            {
+                _gameCameraRigFollow.Clear();
+                return;
+            }
+
+            _gameCameraRigFollow.ApplyDelta(currentMainCamera, _vrRig);
         }
 
         private void UpdateControllerInputLogs()
@@ -632,6 +646,7 @@ namespace UnityVRMod.Features.VrVisualization
             _nextOverlayCameraRefreshTime = 0f;
             _nextSceneCameraSuppressRefreshTime = 0f;
             _currentlyTrackedOriginalCameraGO = null;
+            _gameCameraRigFollow.Clear();
         }
 
         private void TeardownVrInternal()
@@ -1619,4 +1634,3 @@ namespace UnityVRMod.Features.VrVisualization
         }
     }
 }
-

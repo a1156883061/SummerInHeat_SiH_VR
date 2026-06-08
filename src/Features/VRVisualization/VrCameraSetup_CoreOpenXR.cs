@@ -89,6 +89,7 @@ namespace UnityVRMod.Features.VrVisualization
         private bool _hasLoggedXrEndFrameFailure;
 
         private readonly List<List<IntPtr>> _eyeSwapchainSRVs = [];
+        private readonly GameCameraRigFollowState _gameCameraRigFollow = new();
         private readonly OpenXrRigLocomotion _locomotion = new();
         private readonly OpenXrControllerVisualizer _controllerVisualizer = new();
         private readonly OpenXrUiInteractor _uiInteractor = new();
@@ -100,6 +101,10 @@ namespace UnityVRMod.Features.VrVisualization
         private bool _wasPlaneEditTriggerPressed;
         private bool _wasLeftTriggerPressed;
         private bool _wasRightTriggerPressed;
+        private bool _wasFollowModeTogglePressed;
+        private bool _followModeResetQueued;
+        private bool _initialEyeAlignmentQueued;
+        private Vector3 _trackingRecenterLocalOffset = Vector3.zero;
         private OpenXrControlHand? _uiClickHand;
         private OpenXrControlHand? _activeGripHand;
         private OpenXrControlHand? _lastActiveGripHand;
@@ -961,7 +966,7 @@ namespace UnityVRMod.Features.VrVisualization
             EnsureRenderOverrideEyeRetoggled(currentEyeCamera);
 
             XrPosef eyePose = _locatedViews[eyeIndex].pose;
-            Vector3 position = ToUnityLocalPosition(eyePose);
+            Vector3 position = ToRecenteredUnityLocalPosition(eyePose);
             Quaternion rotation = ToUnityLocalRotation(eyePose);
 #if MONO
             currentEyeCamera.transform.localPosition = position;
@@ -1064,6 +1069,9 @@ namespace UnityVRMod.Features.VrVisualization
             bool leftXPressed = IsBooleanActionPressed(_leftXLogState);
             bool rightAPressed = IsBooleanActionPressed(_rightALogState);
             bool rightBPressed = IsBooleanActionPressed(_rightBLogState);
+            bool followModeTogglePressed = IsBooleanActionPressed(_leftThumbstickClickLogState);
+            HandleFollowModeToggle(followModeTogglePressed, currentMainCamera);
+            ApplyGameCameraRigFollow(currentMainCamera);
 
             UpdateSubCameraMoveModeState(
                 rightAPressed,
@@ -1708,7 +1716,7 @@ namespace UnityVRMod.Features.VrVisualization
                 return false;
             }
 
-            Vector3 localPos = ToUnityLocalPosition(location.pose);
+            Vector3 localPos = ToRecenteredUnityLocalPosition(location.pose);
             Quaternion localRot = ToUnityLocalRotation(location.pose);
 
             originWorld = _vrRig.transform.TransformPoint(localPos);
@@ -1753,7 +1761,7 @@ namespace UnityVRMod.Features.VrVisualization
                 return false;
             }
 
-            Vector3 localPos = ToUnityLocalPosition(location.pose);
+            Vector3 localPos = ToRecenteredUnityLocalPosition(location.pose);
             Quaternion localRot = ToUnityLocalRotation(location.pose);
             worldPosition = _vrRig.transform.TransformPoint(localPos);
             worldRotation = _vrRig.transform.rotation * localRot;
@@ -1797,7 +1805,7 @@ namespace UnityVRMod.Features.VrVisualization
                 return false;
             }
 
-            Vector3 localPos = ToUnityLocalPosition(location.pose);
+            Vector3 localPos = ToRecenteredUnityLocalPosition(location.pose);
             Quaternion localRot = ToUnityLocalRotation(location.pose);
 
             originWorld = _vrRig.transform.TransformPoint(localPos);
@@ -1842,7 +1850,7 @@ namespace UnityVRMod.Features.VrVisualization
                 return false;
             }
 
-            Vector3 localPos = ToUnityLocalPosition(location.pose);
+            Vector3 localPos = ToRecenteredUnityLocalPosition(location.pose);
             Quaternion localRot = ToUnityLocalRotation(location.pose);
             worldPosition = _vrRig.transform.TransformPoint(localPos);
             worldRotation = _vrRig.transform.rotation * localRot;
@@ -1953,7 +1961,7 @@ namespace UnityVRMod.Features.VrVisualization
                 return false;
             }
 
-            localPosition = ToUnityLocalPosition(location.pose);
+            localPosition = ToRecenteredUnityLocalPosition(location.pose);
             if (hasOrientation)
             {
                 localRotation = ToUnityLocalRotation(location.pose);
@@ -1965,18 +1973,30 @@ namespace UnityVRMod.Features.VrVisualization
         {
             hmdWorldPos = default;
 
-            if (_vrRig == null || _locatedViews == null || _locatedViews.Length == 0)
+            if (_vrRig == null || !TryGetCurrentHmdLocalPositionFromViews(out Vector3 hmdLocalPos))
             {
                 return false;
             }
 
-            Vector3 hmdLocalPos = ToUnityLocalPosition(_locatedViews[0].pose);
-            if (_locatedViews.Length > 1)
+            hmdWorldPos = _vrRig.transform.TransformPoint(hmdLocalPos);
+            return true;
+        }
+
+        private bool TryGetCurrentHmdLocalPositionFromViews(out Vector3 hmdLocalPos)
+        {
+            hmdLocalPos = default;
+
+            if (_locatedViews == null || _locatedViews.Length == 0)
             {
-                hmdLocalPos = (hmdLocalPos + ToUnityLocalPosition(_locatedViews[1].pose)) * 0.5f;
+                return false;
             }
 
-            hmdWorldPos = _vrRig.transform.TransformPoint(hmdLocalPos);
+            hmdLocalPos = ToRecenteredUnityLocalPosition(_locatedViews[0].pose);
+            if (_locatedViews.Length > 1)
+            {
+                hmdLocalPos = (hmdLocalPos + ToRecenteredUnityLocalPosition(_locatedViews[1].pose)) * 0.5f;
+            }
+
             return true;
         }
 
@@ -1989,6 +2009,86 @@ namespace UnityVRMod.Features.VrVisualization
             }
 
             return Camera.main;
+        }
+
+        private void ApplyGameCameraRigFollow(Camera currentMainCamera)
+        {
+            if (_initialEyeAlignmentQueued)
+            {
+                if (!RecenterTrackingToCurrentHmdHorizontalPosition())
+                {
+                    return;
+                }
+
+                if (currentMainCamera == null || _vrRig == null || !TryGetCurrentHmdLocalPositionFromViews(out Vector3 hmdLocalPosition))
+                {
+                    return;
+                }
+
+                _gameCameraRigFollow.ResetRigToSourceEyePosition(
+                    currentMainCamera,
+                    _vrRig,
+                    hmdLocalPosition,
+                    _lastCalculatedVerticalOffset,
+                    includeHmdHorizontalPosition: false);
+                _initialEyeAlignmentQueued = false;
+            }
+
+            if (!ConfigManager.VrRigFollowsGameCamera.Value)
+            {
+                _gameCameraRigFollow.Clear();
+                return;
+            }
+
+            if (_followModeResetQueued)
+            {
+                if (!RecenterTrackingToCurrentHmdHorizontalPosition())
+                {
+                    return;
+                }
+
+                if (currentMainCamera == null || _vrRig == null || !TryGetCurrentHmdLocalPositionFromViews(out Vector3 hmdLocalPosition))
+                {
+                    return;
+                }
+
+                _gameCameraRigFollow.ResetRigToSourceEyePosition(
+                    currentMainCamera,
+                    _vrRig,
+                    hmdLocalPosition,
+                    _lastCalculatedVerticalOffset,
+                    includeHmdHorizontalPosition: true);
+                _followModeResetQueued = false;
+                return;
+            }
+
+            _gameCameraRigFollow.ApplyDelta(currentMainCamera, _vrRig);
+        }
+
+        private void HandleFollowModeToggle(bool togglePressed, Camera currentMainCamera)
+        {
+            bool toggleEdge = togglePressed && !_wasFollowModeTogglePressed;
+            _wasFollowModeTogglePressed = togglePressed;
+            if (!toggleEdge)
+            {
+                return;
+            }
+
+            bool enableFollowMode = !ConfigManager.VrRigFollowsGameCamera.Value;
+            ConfigManager.VrRigFollowsGameCamera.Value = enableFollowMode;
+
+            if (enableFollowMode)
+            {
+                _gameCameraRigFollow.Clear();
+                _followModeResetQueued = true;
+            }
+            else
+            {
+                _gameCameraRigFollow.Clear();
+                _followModeResetQueued = false;
+            }
+
+            VRModCore.Log($"[CameraFollow] Mode changed: {(enableFollowMode ? "Follow game camera" : "Free VR viewport")}.");
         }
 
         private static OpenXrControlHand GetActiveControlHand()
@@ -2159,6 +2259,37 @@ namespace UnityVRMod.Features.VrVisualization
             return new Vector3(pose.position.x, pose.position.y, -pose.position.z);
         }
 
+        private Vector3 ToRecenteredUnityLocalPosition(in XrPosef pose)
+        {
+            return ToUnityLocalPosition(pose) - _trackingRecenterLocalOffset;
+        }
+
+        private XrPosef ToRecenteredXrPose(in XrPosef pose)
+        {
+            XrPosef recenteredPose = pose;
+            recenteredPose.position.x -= _trackingRecenterLocalOffset.x;
+            recenteredPose.position.y -= _trackingRecenterLocalOffset.y;
+            recenteredPose.position.z += _trackingRecenterLocalOffset.z;
+            return recenteredPose;
+        }
+
+        private bool RecenterTrackingToCurrentHmdHorizontalPosition()
+        {
+            if (_locatedViews == null || _locatedViews.Length == 0)
+            {
+                return false;
+            }
+
+            Vector3 rawHmdLocalPosition = ToUnityLocalPosition(_locatedViews[0].pose);
+            if (_locatedViews.Length > 1)
+            {
+                rawHmdLocalPosition = (rawHmdLocalPosition + ToUnityLocalPosition(_locatedViews[1].pose)) * 0.5f;
+            }
+
+            _trackingRecenterLocalOffset = new Vector3(rawHmdLocalPosition.x, 0f, rawHmdLocalPosition.z);
+            return true;
+        }
+
         private static Quaternion ToUnityLocalRotation(in XrPosef pose)
         {
             return new Quaternion(pose.orientation.x, pose.orientation.y, -pose.orientation.z, -pose.orientation.w);
@@ -2168,7 +2299,7 @@ namespace UnityVRMod.Features.VrVisualization
         {
             for (int i = 0; i < 2; i++)
             {
-                _projectionLayerViews[i].pose = _locatedViews[i].pose;
+                _projectionLayerViews[i].pose = ToRecenteredXrPose(_locatedViews[i].pose);
                 _projectionLayerViews[i].fov = _locatedViews[i].fov;
                 _projectionLayerViews[i].subImage.swapchain = _eyeSwapchains[i];
                 _projectionLayerViews[i].subImage.imageRect.offset = new XrOffset2Di { x = 0, y = 0 };
@@ -2204,6 +2335,7 @@ namespace UnityVRMod.Features.VrVisualization
             _mainCameraLookAtTarget = null;
             _nextLookAtTargetResolveTime = 0f;
             ResolveMainCameraLookAtTarget(mainCamera, force: true);
+            _trackingRecenterLocalOffset = Vector3.zero;
 
             Vector3 targetPosition = mainCamera.transform.position;
             float teleportPlaneY = targetPosition.y;
@@ -2234,6 +2366,8 @@ namespace UnityVRMod.Features.VrVisualization
                 targetRotation = Quaternion.Euler(finalRot);
             }
             _vrRig.transform.SetPositionAndRotation(targetPosition, targetRotation);
+            _gameCameraRigFollow.Reset(mainCamera);
+            _initialEyeAlignmentQueued = true;
 
             _mainCameraClearFlags = mainCamera.clearFlags;
             _mainCameraBackgroundColor = mainCamera.backgroundColor;
@@ -3629,6 +3763,9 @@ namespace UnityVRMod.Features.VrVisualization
             _currentlyTrackedOriginalCameraGO = null;
             _mainCameraLookAtTarget = null;
             _nextLookAtTargetResolveTime = 0f;
+            _gameCameraRigFollow.Clear();
+            _initialEyeAlignmentQueued = false;
+            _trackingRecenterLocalOffset = Vector3.zero;
             _wasPlaneEditTogglePressed = false;
             _wasPlaneEditTriggerPressed = false;
             _wasUiTogglePressed = false;
@@ -3637,6 +3774,9 @@ namespace UnityVRMod.Features.VrVisualization
             _xaClickPendingTime = -1f;
             _wasLeftTriggerPressed = false;
             _wasRightTriggerPressed = false;
+            _wasFollowModeTogglePressed = false;
+            _followModeResetQueued = false;
+            _initialEyeAlignmentQueued = false;
             _uiClickHand = null;
             _activeGripHand = null;
             _lastActiveGripHand = null;

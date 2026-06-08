@@ -1,5 +1,6 @@
 #if MONO
 using HarmonyLib;
+using UnityVRMod.Config;
 using UnityVRMod.Core;
 
 namespace UnityVRMod.Features.VrVisualization
@@ -84,6 +85,11 @@ namespace UnityVRMod.Features.VrVisualization
             if (__instance is not Component cameraComponent) return;
             if (string.Equals(cameraComponent.name, "Camera_Main", StringComparison.OrdinalIgnoreCase))
             {
+                if (ConfigManager.VrRigFollowsGameCamera?.Value == true)
+                {
+                    return;
+                }
+
                 VrVisualizationManager manager = VRModCore.VrVisualizationFeature;
                 if (manager == null) return;
 
