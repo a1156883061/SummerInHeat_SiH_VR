@@ -49,6 +49,7 @@
 | **Snap Turning** | **Right Stick ←→** (always right hand) |
 | **Smooth Turning** | **Right Stick Click (Hold)** + Move ←→ |
 | **Smooth Move / Walk** | **Left Stick** (camera-relative, configurable speed) |
+| **Toggle Follow / Free Mode** | **Left Stick Click** |
 | **Move Viewport** | **Hold Grip (either hand)** & Drag |
 | **Toggle UI Anchor/Follow** | **Click Y(Left) / B(Right)** |
 | **Switch Panel Follow Hand** | **Double-click X(Left) / A(Right)** |
@@ -72,12 +73,18 @@
 2. Move your hand to drag the world.
 3. Release to stop.
 
+### Follow / Free Mode
+
+- **Follow mode**: VR follows the original game camera position and horizontal yaw changes.
+- **Free mode**: VR keeps the current viewport independent from original game camera movement; use **Left Stick**, **Grip drag**, teleport, and turning to adjust view manually.
+- Press **Left Stick Click** to switch modes at runtime.
+
 ### Petting Interaction
 
 1. Move either controller close to the target body point.
 2. When a valid target is detected, the icon turns **blue**.
 3. Press **Trigger** to interact — the icon turns **orange**.
-4. Only works in free mode.
+4. Only works in the game's free mode.
 
 ### SubCamera Control
 
