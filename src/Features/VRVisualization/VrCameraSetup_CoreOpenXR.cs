@@ -16,6 +16,7 @@ namespace UnityVRMod.Features.VrVisualization
         private ulong _xrSession = OpenXRConstants.XR_NULL_HANDLE;
 
         public bool IsVrAvailable { get; private set; } = false;
+        public bool IsGameCameraFollowModeActive => _gameCameraFollowModeActive;
 
         private GameObject _vrRig = null;
         private float _currentAppliedRigScale = 1.0f;
@@ -104,6 +105,10 @@ namespace UnityVRMod.Features.VrVisualization
         private bool _wasFollowModeTogglePressed;
         private bool _followModeResetQueued;
         private bool _initialEyeAlignmentQueued;
+        private bool _gameCameraFollowModeActive;
+        private bool _openXrFrameInProgress;
+        private bool _leftSwapchainImageAcquired;
+        private bool _rightSwapchainImageAcquired;
         private Vector3 _trackingRecenterLocalOffset = Vector3.zero;
         private OpenXrControlHand? _uiClickHand;
         private OpenXrControlHand? _activeGripHand;
@@ -668,6 +673,61 @@ namespace UnityVRMod.Features.VrVisualization
                 $"[OpenXR] xrEndFrame failed: {endFrameResult} (layerCount={frameEndInfo.layerCount}, blend={frameEndInfo.environmentBlendMode})");
         }
 
+        private void SafeEndOpenXrFrameAfterException()
+        {
+            try
+            {
+                SafeReleaseOpenXrSwapchainImages();
+
+                if (!_openXrFrameInProgress || _xrSession == OpenXRConstants.XR_NULL_HANDLE)
+                {
+                    return;
+                }
+
+                var frameEndInfo = new XrFrameEndInfo
+                {
+                    type = XrStructureType.XR_TYPE_FRAME_END_INFO,
+                    displayTime = _xrFrameState.predictedDisplayTime,
+                    environmentBlendMode = XrEnvironmentBlendMode.XR_ENVIRONMENT_BLEND_MODE_OPAQUE,
+                    layerCount = 0,
+                    layers = IntPtr.Zero
+                };
+                XrResult endFrameResult = OpenXRAPI.xrEndFrame(_xrSession, in frameEndInfo);
+                LogEndFrameFailureOnce(endFrameResult, in frameEndInfo);
+            }
+            catch (Exception endFrameEx)
+            {
+                VRModCore.LogError("[OpenXR] Failed to safely end frame after UpdatePoses exception:", endFrameEx);
+            }
+            finally
+            {
+                _openXrFrameInProgress = false;
+                _leftSwapchainImageAcquired = false;
+                _rightSwapchainImageAcquired = false;
+            }
+        }
+
+        private void SafeReleaseOpenXrSwapchainImages()
+        {
+            if (!_leftSwapchainImageAcquired && !_rightSwapchainImageAcquired)
+            {
+                return;
+            }
+
+            var releaseInfo = new XrSwapchainImageReleaseInfo { type = XrStructureType.XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO };
+            if (_leftSwapchainImageAcquired && _eyeSwapchains.Count > 0)
+            {
+                OpenXRAPI.xrReleaseSwapchainImage(_eyeSwapchains[0], in releaseInfo);
+                _leftSwapchainImageAcquired = false;
+            }
+
+            if (_rightSwapchainImageAcquired && _eyeSwapchains.Count > 1)
+            {
+                OpenXRAPI.xrReleaseSwapchainImage(_eyeSwapchains[1], in releaseInfo);
+                _rightSwapchainImageAcquired = false;
+            }
+        }
+
         private ulong StringToPath(string path)
         {
             OpenXRHelper.CheckResult(OpenXRAPI.xrStringToPath(_xrInstance, path, out ulong xrPath), $"xrStringToPath({path})");
@@ -772,6 +832,19 @@ namespace UnityVRMod.Features.VrVisualization
 
         public void UpdatePoses()
         {
+            try
+            {
+                UpdatePosesCore();
+            }
+            catch (Exception ex)
+            {
+                VRModCore.LogError("[OpenXR] UpdatePoses EXCEPTION:", ex);
+                SafeEndOpenXrFrameAfterException();
+            }
+        }
+
+        private void UpdatePosesCore()
+        {
             if (!IsVrAvailable || _xrSession == OpenXRConstants.XR_NULL_HANDLE) return;
             float updatePosesStartTime = Time.realtimeSinceStartup;
             _lastXrLocateViewsCpuMs = 0f;
@@ -850,7 +923,8 @@ namespace UnityVRMod.Features.VrVisualization
             _lastXrWaitFrameCpuMs = (Time.realtimeSinceStartup - waitFrameStartTime) * 1000f;
 
             var frameBeginInfo = new XrFrameBeginInfo { type = XrStructureType.XR_TYPE_FRAME_BEGIN_INFO };
-            if (OpenXRAPI.xrBeginFrame(_xrSession, in frameBeginInfo) == XrResult.XR_FRAME_DISCARDED)
+            XrResult beginFrameResult = OpenXRAPI.xrBeginFrame(_xrSession, in frameBeginInfo);
+            if (beginFrameResult == XrResult.XR_FRAME_DISCARDED)
             {
                 var discardedFrameEndInfo = new XrFrameEndInfo { type = XrStructureType.XR_TYPE_FRAME_END_INFO, displayTime = _xrFrameState.predictedDisplayTime, layerCount = 0, layers = IntPtr.Zero, environmentBlendMode = XrEnvironmentBlendMode.XR_ENVIRONMENT_BLEND_MODE_OPAQUE };
                 float discardedEndFrameStartTime = Time.realtimeSinceStartup;
@@ -861,6 +935,11 @@ namespace UnityVRMod.Features.VrVisualization
                 LogOpenXrPerfIfNeeded();
                 return;
             }
+            if (beginFrameResult < 0)
+            {
+                return;
+            }
+            _openXrFrameInProgress = true;
 
             var frameEndInfo = new XrFrameEndInfo { type = XrStructureType.XR_TYPE_FRAME_END_INFO, displayTime = _xrFrameState.predictedDisplayTime, environmentBlendMode = XrEnvironmentBlendMode.XR_ENVIRONMENT_BLEND_MODE_OPAQUE, layerCount = 0, layers = IntPtr.Zero };
             bool locomotionUpdated = false;
@@ -893,23 +972,30 @@ namespace UnityVRMod.Features.VrVisualization
                 {
                     float swapchainWaitStartTime = Time.realtimeSinceStartup;
                     var acquireInfo = new XrSwapchainImageAcquireInfo { type = XrStructureType.XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO };
-                    OpenXRAPI.xrAcquireSwapchainImage(_eyeSwapchains[0], in acquireInfo, out uint acquiredIdx0);
-                    OpenXRAPI.xrAcquireSwapchainImage(_eyeSwapchains[1], in acquireInfo, out uint acquiredIdx1);
+                    XrResult acquireLeftResult = OpenXRAPI.xrAcquireSwapchainImage(_eyeSwapchains[0], in acquireInfo, out uint acquiredIdx0);
+                    _leftSwapchainImageAcquired = acquireLeftResult == XrResult.XR_SUCCESS;
+                    XrResult acquireRightResult = OpenXRAPI.xrAcquireSwapchainImage(_eyeSwapchains[1], in acquireInfo, out uint acquiredIdx1);
+                    _rightSwapchainImageAcquired = acquireRightResult == XrResult.XR_SUCCESS;
 
-                    var waitInfo = new XrSwapchainImageWaitInfo { type = XrStructureType.XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO, timeout = OpenXRConstants.XR_INFINITE_DURATION };
-                    OpenXRAPI.xrWaitSwapchainImage(_eyeSwapchains[0], in waitInfo);
-                    OpenXRAPI.xrWaitSwapchainImage(_eyeSwapchains[1], in waitInfo);
-                    _lastSwapchainWaitCpuMs = (Time.realtimeSinceStartup - swapchainWaitStartTime) * 1000f;
+                    if (_leftSwapchainImageAcquired && _rightSwapchainImageAcquired)
+                    {
+                        var waitInfo = new XrSwapchainImageWaitInfo { type = XrStructureType.XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO, timeout = OpenXRConstants.XR_INFINITE_DURATION };
+                        OpenXRAPI.xrWaitSwapchainImage(_eyeSwapchains[0], in waitInfo);
+                        OpenXRAPI.xrWaitSwapchainImage(_eyeSwapchains[1], in waitInfo);
+                        _lastSwapchainWaitCpuMs = (Time.realtimeSinceStartup - swapchainWaitStartTime) * 1000f;
 
-                    RenderEye(0, acquiredIdx0);
-                    RenderEye(1, acquiredIdx1);
+                        RenderEye(0, acquiredIdx0);
+                        RenderEye(1, acquiredIdx1);
 
-                    var releaseInfo = new XrSwapchainImageReleaseInfo { type = XrStructureType.XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO };
-                    OpenXRAPI.xrReleaseSwapchainImage(_eyeSwapchains[0], in releaseInfo);
-                    OpenXRAPI.xrReleaseSwapchainImage(_eyeSwapchains[1], in releaseInfo);
+                        SafeReleaseOpenXrSwapchainImages();
 
-                    PopulateProjectionLayer();
-                    submitProjectionLayer = true;
+                        PopulateProjectionLayer();
+                        submitProjectionLayer = true;
+                    }
+                    else
+                    {
+                        SafeReleaseOpenXrSwapchainImages();
+                    }
                 }
             }
 
@@ -929,6 +1015,7 @@ namespace UnityVRMod.Features.VrVisualization
 
             float endFrameStartTime = Time.realtimeSinceStartup;
             XrResult endFrameResult = OpenXRAPI.xrEndFrame(_xrSession, in frameEndInfo);
+            _openXrFrameInProgress = false;
             LogEndFrameFailureOnce(endFrameResult, in frameEndInfo);
             _lastXrEndFrameCpuMs = (Time.realtimeSinceStartup - endFrameStartTime) * 1000f;
             _lastUpdatePosesCpuMs = (Time.realtimeSinceStartup - updatePosesStartTime) * 1000f;
@@ -1296,7 +1383,10 @@ namespace UnityVRMod.Features.VrVisualization
 
             Vector3 hmdWorldPos = default;
             bool hasHmdPose = hasValidViewPose && TryGetCurrentHmdWorldPoseFromViews(out hmdWorldPos);
-            UpdateMainCameraLookAtTargetFollow(currentMainCamera, hasHmdPose, hmdWorldPos);
+            if (!_gameCameraFollowModeActive)
+            {
+                UpdateMainCameraLookAtTargetFollow(currentMainCamera, hasHmdPose, hmdWorldPos);
+            }
             bool hasTeleportPointer = hasPointerPose && isTeleportAiming && !isGripHeld && !isPlaneEditTriggerConsumed;
             Vector3 cameraForwardWorld = currentMainCamera != null ? currentMainCamera.transform.forward : _vrRig.transform.forward;
 
@@ -2034,7 +2124,7 @@ namespace UnityVRMod.Features.VrVisualization
                 _initialEyeAlignmentQueued = false;
             }
 
-            if (!ConfigManager.VrRigFollowsGameCamera.Value)
+            if (!_gameCameraFollowModeActive)
             {
                 _gameCameraRigFollow.Clear();
                 return;
@@ -2074,8 +2164,8 @@ namespace UnityVRMod.Features.VrVisualization
                 return;
             }
 
-            bool enableFollowMode = !ConfigManager.VrRigFollowsGameCamera.Value;
-            ConfigManager.VrRigFollowsGameCamera.Value = enableFollowMode;
+            bool enableFollowMode = !_gameCameraFollowModeActive;
+            _gameCameraFollowModeActive = enableFollowMode;
 
             if (enableFollowMode)
             {
@@ -2336,6 +2426,7 @@ namespace UnityVRMod.Features.VrVisualization
             _nextLookAtTargetResolveTime = 0f;
             ResolveMainCameraLookAtTarget(mainCamera, force: true);
             _trackingRecenterLocalOffset = Vector3.zero;
+            _gameCameraFollowModeActive = ConfigManager.VrRigFollowsGameCamera?.Value ?? true;
 
             Vector3 targetPosition = mainCamera.transform.position;
             float teleportPlaneY = targetPosition.y;
@@ -3777,6 +3868,10 @@ namespace UnityVRMod.Features.VrVisualization
             _wasFollowModeTogglePressed = false;
             _followModeResetQueued = false;
             _initialEyeAlignmentQueued = false;
+            _gameCameraFollowModeActive = false;
+            _openXrFrameInProgress = false;
+            _leftSwapchainImageAcquired = false;
+            _rightSwapchainImageAcquired = false;
             _uiClickHand = null;
             _activeGripHand = null;
             _lastActiveGripHand = null;

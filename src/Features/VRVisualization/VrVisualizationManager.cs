@@ -23,6 +23,7 @@ namespace UnityVRMod.Features.VrVisualization
 
         private bool _hasVrBeenAttemptedByUser = false;
         internal bool IsVrReady => _hasVrBeenAttemptedByUser && _cameraSetup != null && _cameraSetup.IsVrAvailable;
+        internal bool IsGameCameraFollowModeActive => IsVrReady && _cameraSetup != null && _cameraSetup.IsGameCameraFollowModeActive;
         private float _nextCameraJudgeLogTime;
         private string _lastCameraJudgeSignature = string.Empty;
         private const float CameraJudgeLogIntervalSeconds = 1.0f;

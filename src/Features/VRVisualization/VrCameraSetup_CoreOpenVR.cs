@@ -41,6 +41,7 @@ namespace UnityVRMod.Features.VrVisualization
         private readonly Dictionary<Camera, List<Component>> _syncedPostFxComponents = new();
         private readonly Dictionary<Camera, bool> _suppressedSceneCameras = new();
         private readonly List<OverlayCameraBinding> _overlayCameraBindings = new();
+        private bool _gameCameraFollowModeActive;
         private float _nextOverlayCameraRefreshTime;
         private float _nextSceneCameraSuppressRefreshTime;
         private Type _nguiUiCameraType;
@@ -80,6 +81,7 @@ namespace UnityVRMod.Features.VrVisualization
         }
 
         public bool IsVrAvailable => _isVrInitialized && _hmd != null && _compositor != null;
+        public bool IsGameCameraFollowModeActive => _gameCameraFollowModeActive;
 
         public bool InitializeVr(string applicationKey)
         {
@@ -206,6 +208,7 @@ namespace UnityVRMod.Features.VrVisualization
             }
             _vrRig.transform.SetPositionAndRotation(targetPosition, targetRotation);
             _gameCameraRigFollow.Reset(mainCamera);
+            _gameCameraFollowModeActive = ConfigManager.VrRigFollowsGameCamera?.Value ?? true;
 
             _currentAppliedRigScale = 1.0f / Mathf.Max(0.01f, ConfigManager.VrWorldScale.Value);
             _vrRig.transform.localScale = new Vector3(_currentAppliedRigScale, _currentAppliedRigScale, _currentAppliedRigScale);
@@ -320,7 +323,7 @@ namespace UnityVRMod.Features.VrVisualization
 
         private void ApplyGameCameraRigFollow(Camera currentMainCamera)
         {
-            if (!ConfigManager.VrRigFollowsGameCamera.Value)
+            if (!_gameCameraFollowModeActive)
             {
                 _gameCameraRigFollow.Clear();
                 return;
@@ -647,6 +650,7 @@ namespace UnityVRMod.Features.VrVisualization
             _nextSceneCameraSuppressRefreshTime = 0f;
             _currentlyTrackedOriginalCameraGO = null;
             _gameCameraRigFollow.Clear();
+            _gameCameraFollowModeActive = false;
         }
 
         private void TeardownVrInternal()

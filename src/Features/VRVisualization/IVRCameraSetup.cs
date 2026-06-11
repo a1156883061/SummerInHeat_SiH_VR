@@ -9,6 +9,7 @@
     internal interface IVrCameraSetup
     {
         bool IsVrAvailable { get; }
+        bool IsGameCameraFollowModeActive { get; }
         bool InitializeVr(string applicationKey);
         void TeardownVr();
         void SetupCameraRig(Camera mainCamera);

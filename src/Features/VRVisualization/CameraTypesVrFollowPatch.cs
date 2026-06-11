@@ -85,12 +85,12 @@ namespace UnityVRMod.Features.VrVisualization
             if (__instance is not Component cameraComponent) return;
             if (string.Equals(cameraComponent.name, "Camera_Main", StringComparison.OrdinalIgnoreCase))
             {
-                if (ConfigManager.VrRigFollowsGameCamera?.Value == true)
+                VrVisualizationManager manager = VRModCore.VrVisualizationFeature;
+                if (manager?.IsGameCameraFollowModeActive == true)
                 {
                     return;
                 }
 
-                VrVisualizationManager manager = VRModCore.VrVisualizationFeature;
                 if (manager == null) return;
 
                 if (!manager.TryGetVrEyeCenterPoseWorld(out Vector3 vrMidpointWorld, out Quaternion vrCenterRotation)) return;

@@ -6,6 +6,8 @@ namespace UnityVRMod.Features.VrVisualization
     {
         private const float PositionEpsilonSqr = 0.000001f;
         private const float YawEpsilonDegrees = 0.001f;
+        private const float MaxPositionDeltaMetersPerFrame = 2.0f;
+        private const float MaxYawDeltaDegreesPerFrame = 90.0f;
 
         private bool _hasLastPose;
         private Vector3 _lastPosition;
@@ -66,6 +68,11 @@ namespace UnityVRMod.Features.VrVisualization
 
             Vector3 currentPosition = sourceCamera.transform.position;
             float currentYawDegrees = sourceCamera.transform.eulerAngles.y;
+            if (!IsFinite(currentPosition) || !IsFinite(currentYawDegrees))
+            {
+                Clear();
+                return;
+            }
 
             if (!_hasLastPose)
             {
@@ -77,8 +84,22 @@ namespace UnityVRMod.Features.VrVisualization
 
             Vector3 positionDelta = currentPosition - _lastPosition;
             float yawDeltaDegrees = Mathf.DeltaAngle(_lastYawDegrees, currentYawDegrees);
+            float positionDeltaSqr = positionDelta.sqrMagnitude;
+            if (!IsFinite(positionDelta) || !IsFinite(positionDeltaSqr) || !IsFinite(yawDeltaDegrees))
+            {
+                Clear();
+                return;
+            }
 
-            if (positionDelta.sqrMagnitude > PositionEpsilonSqr)
+            if (positionDeltaSqr > MaxPositionDeltaMetersPerFrame * MaxPositionDeltaMetersPerFrame)
+            {
+                positionDelta = positionDelta.normalized * MaxPositionDeltaMetersPerFrame;
+                positionDeltaSqr = positionDelta.sqrMagnitude;
+            }
+
+            yawDeltaDegrees = Mathf.Clamp(yawDeltaDegrees, -MaxYawDeltaDegreesPerFrame, MaxYawDeltaDegreesPerFrame);
+
+            if (positionDeltaSqr > PositionEpsilonSqr)
             {
                 vrRig.transform.position += positionDelta;
             }
@@ -90,6 +111,16 @@ namespace UnityVRMod.Features.VrVisualization
 
             _lastPosition = currentPosition;
             _lastYawDegrees = currentYawDegrees;
+        }
+
+        private static bool IsFinite(Vector3 value)
+        {
+            return IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z);
+        }
+
+        private static bool IsFinite(float value)
+        {
+            return !float.IsNaN(value) && !float.IsInfinity(value);
         }
     }
 }
