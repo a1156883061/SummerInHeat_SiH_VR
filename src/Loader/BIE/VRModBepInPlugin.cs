@@ -30,7 +30,7 @@ namespace UnityVRMod
     {
         public const string GUID = "com.newunitymodder.unityvrmod";
         public const string MOD_NAME = "Unity VR Mod";
-        public const string VERSION = "1.0.0";
+        public const string VERSION = VRModCore.VERSION;
 
         public static VRModBepInPlugin Instance { get; private set; }
 
