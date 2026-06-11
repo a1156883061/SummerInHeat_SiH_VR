@@ -75,6 +75,7 @@ namespace UnityVRMod.Features.VrVisualization
         private bool _loggedUiSurfaceFallback;
         private bool _loggedSubCameraRectFallback;
         private bool _wasTriggerPressed;
+        private bool _wasUiRayTouchTriggerPressed;
         private bool _pointerIsDown;
         private PointerSurfaceKind _activePointerSurface;
         private bool _resolvedUiRayLayerMask;
@@ -200,6 +201,7 @@ namespace UnityVRMod.Features.VrVisualization
             _loggedUiSurfaceFallback = false;
             _loggedSubCameraRectFallback = false;
             _wasTriggerPressed = false;
+            _wasUiRayTouchTriggerPressed = false;
             _pointerIsDown = false;
             _activePointerSurface = PointerSurfaceKind.None;
             _resolvedUiRayLayerMask = false;
@@ -280,6 +282,7 @@ namespace UnityVRMod.Features.VrVisualization
             _loggedUiSurfaceFallback = false;
             _loggedSubCameraRectFallback = false;
             _wasTriggerPressed = false;
+            _wasUiRayTouchTriggerPressed = false;
             _activePointerSurface = PointerSurfaceKind.None;
             _resolvedUiRayLayerMask = false;
             _loggedUiRayLayerFallback = false;
@@ -537,6 +540,9 @@ namespace UnityVRMod.Features.VrVisualization
 
         public bool UpdateUiRayTouch(GameObject vrRig, bool hasHandPose, Vector3 handWorldPos, Quaternion handWorldRot, bool triggerPressed)
         {
+            bool triggerPressedThisFrame = triggerPressed && !_wasUiRayTouchTriggerPressed;
+            _wasUiRayTouchTriggerPressed = triggerPressed;
+
             if (vrRig == null)
             {
                 SetControllerIconVisible(false);
@@ -568,9 +574,9 @@ namespace UnityVRMod.Features.VrVisualization
 
             UpdateControllerIconVisual(_fixedTouchIconTexture, handWorldPos, handWorldRot);
 
-            // 直接检查扳机 + 图标匹配，不用边沿检测
+            // 只在扳机按下边沿触发一次，避免按住时重复调用游戏触摸逻辑。
             bool triggered = false;
-            if (mappedIconHit && triggerPressed)
+            if (mappedIconHit && triggerPressedThisFrame)
             {
                 triggered = TryInvokeZngButtonDown(icon);
             }
