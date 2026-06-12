@@ -12,28 +12,31 @@
 *   **高级移动系统**：VR 传送和舒适视角控制（快照/平滑转向）。
 *   **动态 UI 管理**：可在 VR 中重新定位和缩放游戏内 UI 面板。
 *   **无缝视角切换**：优化的第一人称相机绑定和场景过渡。
+*   **支持物理交互**：可以触碰头发、胸部、裙子等有物理效果的部位
 
 ---
 
 ## 🛠️ 环境要求
 
 *   **游戏**：Summer in Heat（夏のサカり）
-*   **框架**：[BepInEx 6 x64](https://github.com/BepInEx/BepInEx/releases) pre.2
-*   **测试设备**：Meta Quest 3（通过 Meta Quest Link / Air Link）
+*   **框架**：[BepInEx 5 x64](https://github.com/BepInEx/BepInEx/releases)
+    * 也支持BepInEx 6,可以自行编译
+*   **测试设备**：Meta Quest 3（通过 Meta Quest Link / Air Link, Virtual Desktop）,Pico neo3, Pico 4
     *   *注：其他头显可能通过 OpenXR 兼容，但未经过正式测试。*
+    *   *pico3/4为其他人测试*
 
 ---
 
 ## 🚀 安装
 
-1. **安装 BepInEx 6**：确保游戏目录中已安装 x64 版本的 BepInEx 6。
-2. **部署模组文件**：将发布包中的内容解压到 `BepInEx/` 文件夹。
+1. **安装 BepInEx 5**：确保游戏目录中已安装 x64 版本的 BepInEx 5。
+2. **部署模组文件**：将发布包中的内容解压到 `游戏主目录（即"『夏のサカり』起動ランチャー.exe"所在的目录）` 文件夹。
 3. **配置**：
    *   首次启动游戏以生成初始配置文件。
-   *   （可选）将发布包 `config/` 中的 `.cfg` 文件复制到 `GameData/BepInEx/config/`。
-4. **启动 VR**：
+4. **两个方法启动 VR**：
    *   启动 VR 运行时（如 Meta Quest Link 或 Virtual Desktop）。
    *   启动游戏，按 **F11** 切换 VR 模式（可在配置文件中自定义按键）。
+   *   直接启动 **start_vr.cmd**
 
 ---
 
@@ -102,7 +105,6 @@
 > [!NOTE]
 > 此模组正在积极开发中。以下是目前已知的限制和计划更新：
 
-*   **硬件兼容性**：已针对 Quest 3 优化，其他头显正在评估中。
 *   **ADV 场景**：目前以 2D 投影方式显示，VR 中视觉效果可能有所不同。
 *   **UI 集成**：某些对话框图标需通过主 UI 面板交互，无法直接点击。
 *   **性能注意**：高画质设置和特效会显著影响 VR 帧率，请谨慎调整以确保稳定性。

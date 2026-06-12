@@ -12,28 +12,31 @@
 *   **Advanced Locomotion**: Includes VR Teleportation and comfort-focused view controls (Snap/Smooth turning).
 *   **Dynamic UI Management**: Reposition and scale in-game UI panels in VR.
 *   **Seamless Perspective**: Optimized first-person camera bindings and fixed scene transitions.
+*   **Physics Interaction Support**: Interact with physics-enabled parts such as hair, breasts, and skirts.
 
 ---
 
 ## 🛠️ Prerequisites & Hardware
 
 *   **Game**: Summer in Heat (夏のサカり)
-*   **Core Framework**: [BepInEx 6 (x64)](https://github.com/BepInEx/BepInEx/releases) pre.2
-*   **Tested Hardware**: Meta Quest 3 (via Meta Quest Link / Air Link).
+*   **Core Framework**: [BepInEx 5 x64](https://github.com/BepInEx/BepInEx/releases)
+    *   BepInEx 6 is also supported if you build it yourself.
+*   **Tested Hardware**: Meta Quest 3 (via Meta Quest Link / Air Link / Virtual Desktop), Pico neo3, Pico 4.
     *   *Note: Other headsets may work via OpenXR but have not been officially tested.*
+    *   *Pico 3/4 testing was reported by other users.*
 
 ---
 
 ## 🚀 Installation
 
-1.  **Install BepInEx 6**: Ensure you have the x64 version of BepInEx 6 installed in your game directory.
-2.  **Deploy Mod Files**: Extract the contents of this release into your `BepInEx/` folder.
+1.  **Install BepInEx 5**: Ensure you have the x64 version of BepInEx 5 installed in your game directory.
+2.  **Deploy Mod Files**: Extract the contents of this release into the game root folder, the same folder that contains `『夏のサカり』起動ランチャー.exe`.
 3.  **Configure**:
     *   Launch the game once to generate initial configuration files.
-    *   (Optional) Copy any provided `.cfg` files from the release `config/` folder to `GameData/BepInEx/config/`.
-4.  **Launch VR**: 
-    *   Start your VR runtime (e.g., Meta Quest Link).
+4.  **Launch VR using either method**:
+    *   Start your VR runtime (e.g., Meta Quest Link or Virtual Desktop).
     *   Launch the game and press **F11** to toggle VR mode (the toggle key can be customized in the configuration file).
+    *   Or start **start_vr.cmd** directly.
 
 ---
 
@@ -66,6 +69,7 @@
 
 - **Either trigger clicks UI**: Press trigger on left or right hand — the clicking hand is locked on first press and stays until the other hand clicks.
 - **Panel follow hand**: Double-click X(Left) or A(Right) to toggle which hand the UI panel follows. Panel position is independent of the control hand used for locomotion.
+- **Panel visibility**: Click X(Left) or A(Right) to show/hide the UI panel. This is disabled in Hybrid2D scenes.
 
 ### Move Viewport
 
@@ -101,7 +105,6 @@
 > [!NOTE]
 > This mod is under active development. Below are the current known limitations and planned updates:
 
-*   **Hardware Compatibility**: Optimized for Quest 3. Compatibility for other HMDs is being evaluated.
 *   **ADV Scene**: Currently displayed as a 2D projection. Visual effects in VR may differ from the PC version and will be addressed in future updates.
 *   **UI Integration**: Certain dialog icons currently require interaction via the main UI panel rather than direct clicking.
 *   **Performance Note**: High graphics settings and effects significantly impact VR frame rates; adjust carefully for stability.
