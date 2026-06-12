@@ -60,6 +60,10 @@ namespace UnityVRMod.Config
         public static ConfigElement<float> OpenXR_PhysicsDiagnosticsRadius;
         public static ConfigElement<float> OpenXR_PhysicsDiagnosticsIntervalSeconds;
 #endif
+        public static ConfigElement<bool> OpenXR_EnableDynamicBoneHandColliders;
+        public static ConfigElement<float> OpenXR_DynamicBoneHandColliderRadius;
+        public static ConfigElement<bool> OpenXR_EnableMagicaClothHandColliders;
+        public static ConfigElement<float> OpenXR_MagicaClothHandColliderRadius;
         public static ConfigElement<string> OpenXR_ForceDefaultRenderScenes;
         public static ConfigElement<string> OpenXR_ForceSolidClearScenes;
 #endif
@@ -229,6 +233,18 @@ namespace UnityVRMod.Config
             OpenXR_PhysicsDiagnosticsIntervalSeconds = new ConfigElement<float>("OpenXR Physics Diagnostics Interval Seconds",
                 "[OpenXR ONLY][PHYSICS_LOG] Minimum seconds between physics diagnostic log entries.", 1.0f);
 #endif
+
+            OpenXR_EnableDynamicBoneHandColliders = new ConfigElement<bool>("OpenXR Enable DynamicBone Hand Colliders",
+                "[OpenXR ONLY] Experimental: creates runtime DynamicBoneCollider proxies at the controller grip poses and adds them to character breast/hair DynamicBone collider lists.", true);
+
+            OpenXR_DynamicBoneHandColliderRadius = new ConfigElement<float>("OpenXR DynamicBone Hand Collider Radius",
+                "[OpenXR ONLY] Radius in meters for the experimental DynamicBone hand collider proxies.", 0.06f);
+
+            OpenXR_EnableMagicaClothHandColliders = new ConfigElement<bool>("OpenXR Enable MagicaCloth Hand Colliders",
+                "[OpenXR ONLY] Experimental: creates runtime MagicaCloth2 sphere collider proxies at the controller grip poses and adds them to active MagicaCloth components.", true);
+
+            OpenXR_MagicaClothHandColliderRadius = new ConfigElement<float>("OpenXR MagicaCloth Hand Collider Radius",
+                "[OpenXR ONLY] Radius in meters for the experimental MagicaCloth2 hand collider proxies.", 0.06f);
 
             OpenXR_ForceDefaultRenderScenes = new ConfigElement<string>("OpenXR Force Default Render Scenes",
                 "[OpenXR ONLY] Forces safe default VR eye-camera render state in specific scenes to avoid artifacts from copied main-camera settings. Format: 'SceneNameA;SceneNameB;'.", "");

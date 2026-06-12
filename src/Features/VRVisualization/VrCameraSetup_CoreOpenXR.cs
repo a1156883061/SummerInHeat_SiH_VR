@@ -96,6 +96,8 @@ namespace UnityVRMod.Features.VrVisualization
 #if PHYSICS_LOG
         private readonly OpenXrPhysicsDiagnostics _physicsDiagnostics = new();
 #endif
+        private readonly OpenXrDynamicBoneHandColliders _dynamicBoneHandColliders = new();
+        private readonly OpenXrMagicaClothHandColliders _magicaClothHandColliders = new();
         private readonly OpenXrUiInteractor _uiInteractor = new();
         private readonly OpenXrUiProjectionPlane _uiProjectionPlane = new();
         private readonly OpenXrDanmenProjectionPlane _danmenProjectionPlane = new();
@@ -1265,6 +1267,22 @@ namespace UnityVRMod.Features.VrVisualization
                 hasRightHandWorldPose,
                 rightHandWorldPos);
 #endif
+
+            _dynamicBoneHandColliders.Update(
+                hasLeftHandWorldPose,
+                leftHandWorldPos,
+                leftHandWorldRot,
+                hasRightHandWorldPose,
+                rightHandWorldPos,
+                rightHandWorldRot);
+
+            _magicaClothHandColliders.Update(
+                hasLeftHandWorldPose,
+                leftHandWorldPos,
+                leftHandWorldRot,
+                hasRightHandWorldPose,
+                rightHandWorldPos,
+                rightHandWorldRot);
 
             bool hasActiveHandWorldPose = useLeftControlHand ? hasLeftHandWorldPose : hasRightHandWorldPose;
             Vector3 activeHandWorldPos = useLeftControlHand ? leftHandWorldPos : rightHandWorldPos;
@@ -3851,6 +3869,8 @@ namespace UnityVRMod.Features.VrVisualization
 #if PHYSICS_LOG
             _physicsDiagnostics.Reset();
 #endif
+            _dynamicBoneHandColliders.Reset();
+            _magicaClothHandColliders.Reset();
             _uiProjectionPlane.Teardown();
             _uiInteractor.Teardown();
             _danmenProjectionPlane.Teardown();
