@@ -35,9 +35,8 @@ namespace UnityVRMod.Core
             for (int i = 0; i < args.Length; i++)
                 if (args[i] == "--vr") { _autoVrRequested = true; break; }
 
-            Log($"{MOD_NAME} {VERSION} initializing...");
-
             ConfigManager.Init(Loader.ConfigHandler);
+            Log($"{MOD_NAME} {VERSION} initializing...");
 
             var universeConfig = new UniverseLib.Config.UniverseLibConfig
             {
@@ -121,6 +120,8 @@ namespace UnityVRMod.Core
         private static void LogImpl(object message, UnityEngine.LogType logType, string callerName, string callerFile, int callerLine)
         {
             if (Loader == null || message == null) return;
+            if (!ShouldLog(logType)) return;
+
             string messageStr = message.ToString();
             string formattedMessage;
 
@@ -155,6 +156,30 @@ namespace UnityVRMod.Core
                 case UnityEngine.LogType.Exception:
                     Loader.LogError(formattedMessage);
                     break;
+            }
+        }
+
+        private static bool ShouldLog(UnityEngine.LogType logType)
+        {
+            ModLogLevel configuredLevel = ConfigManager.LogLevel?.Value ?? ModLogLevel.Info;
+            if (configuredLevel == ModLogLevel.Off) return false;
+
+            return GetMessageLogLevel(logType) <= configuredLevel;
+        }
+
+        private static ModLogLevel GetMessageLogLevel(UnityEngine.LogType logType)
+        {
+            switch (logType)
+            {
+                case UnityEngine.LogType.Error:
+                case UnityEngine.LogType.Exception:
+                case UnityEngine.LogType.Assert:
+                    return ModLogLevel.Error;
+                case UnityEngine.LogType.Warning:
+                    return ModLogLevel.Warning;
+                case UnityEngine.LogType.Log:
+                default:
+                    return ModLogLevel.Info;
             }
         }
 

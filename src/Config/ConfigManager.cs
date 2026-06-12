@@ -11,6 +11,9 @@ namespace UnityVRMod.Config
         internal static InternalConfigHandler InternalHandler { get; private set; }
 
         // -------- CONFIG ELEMENT DEFINITIONS --------
+        // --- Logging Settings ---
+        public static ConfigElement<ModLogLevel> LogLevel;
+
         // --- Internal Settings (Require Restart) ---
         public static ConfigElement<float> Startup_Delay_Time;
         public static ConfigElement<bool> Disable_EventSystem_Override;
@@ -70,6 +73,8 @@ namespace UnityVRMod.Config
         {
             Handler = mainHandler;
             Handler.Init();
+
+            CreateLoggingConfigElement();
 
             InternalHandler = new InternalConfigHandler();
             InternalHandler.Init();
@@ -241,6 +246,12 @@ namespace UnityVRMod.Config
                 "");
 
             VRModCore.Log($"Finished creating {ConfigElements.Count + InternalConfigs.Count} config elements.");
+        }
+
+        private static void CreateLoggingConfigElement()
+        {
+            LogLevel = new ConfigElement<ModLogLevel>("Log Level",
+                "Controls Unity VR Mod log output. Off disables all mod logs; Error logs only errors; Warning logs warnings and errors; Info logs normal messages, warnings, and errors.", ModLogLevel.Warning);
         }
 
         public static void SaveAll()
