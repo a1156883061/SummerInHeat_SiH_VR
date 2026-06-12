@@ -55,6 +55,11 @@ namespace UnityVRMod.Config
         public static ConfigElement<float> OpenXR_SmoothTurnDegreesPerSecond;
         public static ConfigElement<OpenXrControlHand> OpenXR_ControlHand;
         public static ConfigElement<bool> OpenXR_EnablePerfLogging;
+#if PHYSICS_LOG
+        public static ConfigElement<bool> OpenXR_EnablePhysicsDiagnostics;
+        public static ConfigElement<float> OpenXR_PhysicsDiagnosticsRadius;
+        public static ConfigElement<float> OpenXR_PhysicsDiagnosticsIntervalSeconds;
+#endif
         public static ConfigElement<string> OpenXR_ForceDefaultRenderScenes;
         public static ConfigElement<string> OpenXR_ForceSolidClearScenes;
 #endif
@@ -213,6 +218,17 @@ namespace UnityVRMod.Config
 
             OpenXR_EnablePerfLogging = new ConfigElement<bool>("OpenXR Enable Perf Logging",
                 "[OpenXR ONLY] Enables periodic [Perf][OpenXR] timing logs for diagnosis.", false);
+
+#if PHYSICS_LOG
+            OpenXR_EnablePhysicsDiagnostics = new ConfigElement<bool>("OpenXR Enable Physics Diagnostics",
+                "[OpenXR ONLY][PHYSICS_LOG] If true, logs nearby colliders and candidate body physics components around the controller grip poses. Diagnostic only; does not modify game physics.", false);
+
+            OpenXR_PhysicsDiagnosticsRadius = new ConfigElement<float>("OpenXR Physics Diagnostics Radius",
+                "[OpenXR ONLY][PHYSICS_LOG] Radius in meters used by the runtime physics diagnostics overlap probe around each controller.", 0.08f);
+
+            OpenXR_PhysicsDiagnosticsIntervalSeconds = new ConfigElement<float>("OpenXR Physics Diagnostics Interval Seconds",
+                "[OpenXR ONLY][PHYSICS_LOG] Minimum seconds between physics diagnostic log entries.", 1.0f);
+#endif
 
             OpenXR_ForceDefaultRenderScenes = new ConfigElement<string>("OpenXR Force Default Render Scenes",
                 "[OpenXR ONLY] Forces safe default VR eye-camera render state in specific scenes to avoid artifacts from copied main-camera settings. Format: 'SceneNameA;SceneNameB;'.", "");

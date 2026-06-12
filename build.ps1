@@ -4,7 +4,8 @@ param (
     [switch]$MonoOnly,
     [switch]$Il2CppOnly,
     [switch]$DebugBuild,
-	[switch]$DebugHelper
+    [switch]$DebugHelper,
+    [switch]$PhysicsLog
 )
 
 function Resolve-MsBuildPath {
@@ -101,6 +102,9 @@ Write-Host "--------------------------------------------------"
 $ConfigBuildSuffix = if ($DebugBuild.IsPresent) { "Debug" } else { "Release" }
 $OutputFolderSuffix = if ($DebugBuild.IsPresent) { ".Debug" } else { "" }
 Write-Host "Selected overall build type: $ConfigBuildSuffix"
+if ($PhysicsLog.IsPresent) {
+    Write-Host "Physics diagnostics compile flag enabled: PHYSICS_LOG"
+}
 
 # --- Base Definitions for Runtimes ---
 $MonoBaseDefinition = @{
@@ -179,7 +183,12 @@ foreach ($currentTargetDef in $targetsToBuildActual) {
 
     if (-not (Test-Path $CurrentOutputPath)) { New-Item -Path $CurrentOutputPath -ItemType Directory -Force | Out-Null }
 
-    dotnet build $SolutionFile -c $ConfigToUse
+    $DotNetBuildArgs = @("build", $SolutionFile, "-c", $ConfigToUse)
+    if ($PhysicsLog.IsPresent) {
+        $DotNetBuildArgs += "/p:PhysicsLog=true"
+    }
+
+    & dotnet @DotNetBuildArgs
     if ($LASTEXITCODE -ne 0) { Write-Error "Build FAILED for $ConfigToUse."; continue }
 
     $OutputDllPath = Join-Path $CurrentOutputPath $FinalDllName

@@ -12,6 +12,7 @@
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>    
 	<Configurations>BIE_Unity_Mono_OpenVR_Debug;BIE_Unity_Mono_OpenVR_Release;BIE_Unity_Cpp_OpenVR_Debug;BIE_Unity_Cpp_OpenVR_Release;BIE_Unity_Mono_OpenXR_Debug;BIE_Unity_Mono_OpenXR_Release;BIE_Unity_Cpp_OpenXR_Debug;BIE_Unity_Cpp_OpenXR_Release;BIE5_Unity_Mono_OpenVR_Debug;BIE5_Unity_Mono_OpenVR_Release;BIE5_Unity_Mono_OpenXR_Debug;BIE5_Unity_Mono_OpenXR_Release</Configurations>
     <NoWarn>$(NoWarn);NU1603</NoWarn>
+    <PhysicsLog Condition="'$(PhysicsLog)'==''">false</PhysicsLog>
   </PropertyGroup>
 
   <ItemGroup>
@@ -153,6 +154,10 @@
     <Optimize>true</Optimize>
     <DebugSymbols>false</DebugSymbols>
     <DebugType>none</DebugType>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(PhysicsLog)'=='true'">
+    <DefineConstants>$(DefineConstants),PHYSICS_LOG</DefineConstants>
   </PropertyGroup>
 
   <!-- Conditional Source File Compilation -->

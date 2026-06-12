@@ -93,6 +93,9 @@ namespace UnityVRMod.Features.VrVisualization
         private readonly GameCameraRigFollowState _gameCameraRigFollow = new();
         private readonly OpenXrRigLocomotion _locomotion = new();
         private readonly OpenXrControllerVisualizer _controllerVisualizer = new();
+#if PHYSICS_LOG
+        private readonly OpenXrPhysicsDiagnostics _physicsDiagnostics = new();
+#endif
         private readonly OpenXrUiInteractor _uiInteractor = new();
         private readonly OpenXrUiProjectionPlane _uiProjectionPlane = new();
         private readonly OpenXrDanmenProjectionPlane _danmenProjectionPlane = new();
@@ -1254,6 +1257,14 @@ namespace UnityVRMod.Features.VrVisualization
                 hasLeftHandWorldPose = TryGetLeftGripPoseWorldTransform(_xrFrameState.predictedDisplayTime, out leftHandWorldPos, out leftHandWorldRot);
                 hasRightHandWorldPose = TryGetRightGripPoseWorldTransform(_xrFrameState.predictedDisplayTime, out rightHandWorldPos, out rightHandWorldRot);
             }
+
+#if PHYSICS_LOG
+            _physicsDiagnostics.Update(
+                hasLeftHandWorldPose,
+                leftHandWorldPos,
+                hasRightHandWorldPose,
+                rightHandWorldPos);
+#endif
 
             bool hasActiveHandWorldPose = useLeftControlHand ? hasLeftHandWorldPose : hasRightHandWorldPose;
             Vector3 activeHandWorldPos = useLeftControlHand ? leftHandWorldPos : rightHandWorldPos;
@@ -3837,6 +3848,9 @@ namespace UnityVRMod.Features.VrVisualization
             VRModCore.LogRuntimeDebug("Tearing down VR camera rig.");
             _locomotion.Teardown();
             _controllerVisualizer.Teardown();
+#if PHYSICS_LOG
+            _physicsDiagnostics.Reset();
+#endif
             _uiProjectionPlane.Teardown();
             _uiInteractor.Teardown();
             _danmenProjectionPlane.Teardown();
