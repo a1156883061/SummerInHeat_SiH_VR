@@ -2017,6 +2017,12 @@ namespace UnityVRMod.Features.VrVisualization
 
             currentEyeCamera.targetTexture = currentIntermediateRT;
             ApplyVrCameraRenderState(currentEyeCamera);
+            // The eye texture is reused across frames. Clear it explicitly before
+            // any camera or image effect can blend with a previous frame.
+            RenderTexture previousRenderTarget = RenderTexture.active;
+            RenderTexture.active = currentIntermediateRT;
+            GL.Clear(true, true, VrRigClearColor);
+            RenderTexture.active = previousRenderTarget;
             // Some legacy image-effects initialize/use camera callbacks only when the camera is enabled.
             // Keep it enabled only during manual Render() and disable immediately after to avoid auto rendering.
             currentEyeCamera.enabled = true;
@@ -4005,6 +4011,17 @@ namespace UnityVRMod.Features.VrVisualization
             }
 
             if (_isUsingForcedSolidClearState)
+            {
+                vrCam.clearFlags = CameraClearFlags.SolidColor;
+                vrCam.backgroundColor = VrRigClearColor;
+                vrCam.cullingMask = sceneCullingMask;
+                return;
+            }
+
+            // Each OpenXR eye renders into a reused texture. A source camera that
+            // clears only depth (or nothing) leaves prior eye frames visible.
+            if (_mainCameraClearFlags == CameraClearFlags.Depth ||
+                _mainCameraClearFlags == CameraClearFlags.Nothing)
             {
                 vrCam.clearFlags = CameraClearFlags.SolidColor;
                 vrCam.backgroundColor = VrRigClearColor;
