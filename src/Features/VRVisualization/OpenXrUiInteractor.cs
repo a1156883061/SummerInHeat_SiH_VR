@@ -756,7 +756,7 @@ namespace UnityVRMod.Features.VrVisualization
                         return new SurfaceRaycastResult(PointerSurfaceKind.UiProjection, false, true, false, default, visualHitPoint, enterDistance);
                     }
 
-                    Rect clampedMappingRect = GetPrimaryNguiScreenRect();
+                    Rect clampedMappingRect = GetUiProjectionScreenRect();
                     Vector2 clampedMappedScreenPos = new(
                         clampedMappingRect.xMin + (uv.x * clampedMappingRect.width),
                         clampedMappingRect.yMin + (uv.y * clampedMappingRect.height));
@@ -773,7 +773,7 @@ namespace UnityVRMod.Features.VrVisualization
                 return new SurfaceRaycastResult(PointerSurfaceKind.UiProjection, false, true, false, default, visualHitPoint, enterDistance);
             }
 
-            Rect mappingRect = GetPrimaryNguiScreenRect();
+            Rect mappingRect = GetUiProjectionScreenRect();
             Vector2 mappedScreenPos = new(
                 mappingRect.xMin + (uv.x * mappingRect.width),
                 mappingRect.yMin + (uv.y * mappingRect.height));
@@ -1436,6 +1436,13 @@ namespace UnityVRMod.Features.VrVisualization
             }
 
             return bestCamera != null;
+        }
+
+        private static Rect GetUiProjectionScreenRect()
+        {
+            // This plane displays the entire capture texture, so its UVs map to
+            // the entire Unity screen rather than the source camera viewport.
+            return new Rect(0f, 0f, Screen.width, Screen.height);
         }
 
         private static Rect GetPrimaryNguiScreenRect()
@@ -2844,8 +2851,15 @@ namespace UnityVRMod.Features.VrVisualization
             float clampedX = Mathf.Clamp(pointerScreenPos.x, 0f, screenWidth);
             float clampedY = Mathf.Clamp(pointerScreenPos.y, 0f, screenHeight);
 
-            int clientX = Mathf.Clamp(Mathf.RoundToInt((clampedX / screenWidth) * (clientWidth - 1)), 0, clientWidth - 1);
-            int clientY = Mathf.Clamp(Mathf.RoundToInt(((screenHeight - clampedY) / screenHeight) * (clientHeight - 1)), 0, clientHeight - 1);
+            // Fit Unity's render dimensions within the client area. This accounts
+            // for centered letterboxing at any aspect ratio or window size.
+            float contentScale = Mathf.Min((float)clientWidth / Screen.width, (float)clientHeight / Screen.height);
+            float contentWidth = Screen.width * contentScale;
+            float contentHeight = Screen.height * contentScale;
+            float contentLeft = (clientWidth - contentWidth) * 0.5f;
+            float contentTop = (clientHeight - contentHeight) * 0.5f;
+            int clientX = Mathf.Clamp(Mathf.RoundToInt(contentLeft + (clampedX / screenWidth) * (contentWidth - 1f)), 0, clientWidth - 1);
+            int clientY = Mathf.Clamp(Mathf.RoundToInt(contentTop + ((screenHeight - clampedY) / screenHeight) * (contentHeight - 1f)), 0, clientHeight - 1);
 
             POINT clientPoint = new() { X = clientX, Y = clientY };
             if (!ClientToScreen(windowHandle, ref clientPoint))
