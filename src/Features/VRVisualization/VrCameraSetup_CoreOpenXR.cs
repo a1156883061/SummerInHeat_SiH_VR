@@ -14,6 +14,7 @@ namespace UnityVRMod.Features.VrVisualization
     {
         private const long DxgiFormatB8G8R8A8Unorm = 87;
         private const long DxgiFormatB8G8R8A8UnormSrgb = 91;
+        private const float AdvInitialForwardOffsetMeters = 1.2f;
 
         private ulong _xrInstance = OpenXRConstants.XR_NULL_HANDLE;
         private ulong _xrSystemId = OpenXRConstants.XR_NULL_SYSTEM_ID;
@@ -2036,6 +2037,14 @@ namespace UnityVRMod.Features.VrVisualization
             projM = Matrix4x4.Scale(new Vector3(1, -1, 1)) * projM;
             currentEyeCamera.projectionMatrix = projM;
 
+            if (CameraJudge.IsHybrid2DSceneActive() && _locatedViews.Length >= 2)
+            {
+                Vector3 leftEye = ToRecenteredUnityLocalPosition(_locatedViews[0].pose);
+                Vector3 rightEye = ToRecenteredUnityLocalPosition(_locatedViews[1].pose);
+                _uiProjectionPlane.PrepareAdvEye(eyeIndex, position, (leftEye + rightEye) * 0.5f,
+                    currentEyeCamera.transform.rotation);
+            }
+
             bool originalInvertCulling = GL.invertCulling;
             try
             {
@@ -3526,6 +3535,10 @@ namespace UnityVRMod.Features.VrVisualization
                     hmdLocalPosition,
                     _lastCalculatedVerticalOffset,
                     includeHmdHorizontalPosition: false);
+                if (IsNativeAdvCamera())
+                {
+                    _vrRig.transform.position += _vrRig.transform.forward * AdvInitialForwardOffsetMeters;
+                }
                 _initialEyeAlignmentQueued = false;
             }
 
@@ -3564,6 +3577,7 @@ namespace UnityVRMod.Features.VrVisualization
         {
             bool toggleEdge = togglePressed && !_wasFollowModeTogglePressed;
             _wasFollowModeTogglePressed = togglePressed;
+            if (IsNativeAdvCamera()) return;
             if (!toggleEdge)
             {
                 return;
@@ -3589,6 +3603,12 @@ namespace UnityVRMod.Features.VrVisualization
         private static OpenXrControlHand GetActiveControlHand()
         {
             return ConfigManager.OpenXR_ControlHand?.Value ?? OpenXrControlHand.Right;
+        }
+
+        private bool IsNativeAdvCamera()
+        {
+            return CameraJudge.IsHybrid2DSceneActive() &&
+                string.Equals(_currentlyTrackedOriginalCameraGO?.name, "Camera_ADV", StringComparison.Ordinal);
         }
 
         private void PlayUiTouchHaptic(OpenXrControlHand controlHand)
@@ -3843,7 +3863,8 @@ namespace UnityVRMod.Features.VrVisualization
             _nextLookAtTargetResolveTime = 0f;
             ResolveMainCameraLookAtTarget(mainCamera, force: true);
             _trackingRecenterLocalOffset = Vector3.zero;
-            _gameCameraFollowModeActive = ConfigManager.VrRigFollowsGameCamera?.Value ?? true;
+            _gameCameraFollowModeActive = !IsNativeAdvCamera() &&
+                (ConfigManager.VrRigFollowsGameCamera?.Value ?? true);
 
             Vector3 targetPosition = mainCamera.transform.position;
             float teleportPlaneY = targetPosition.y;
@@ -3872,6 +3893,10 @@ namespace UnityVRMod.Features.VrVisualization
                 Vector3 finalRot = new(float.IsNaN(r.x) ? originalRot.x : r.x, float.IsNaN(r.y) ? originalRot.y : r.y, float.IsNaN(r.z) ? originalRot.z : r.z);
                 targetPosition = finalPos;
                 targetRotation = Quaternion.Euler(finalRot);
+            }
+            if (IsNativeAdvCamera())
+            {
+                targetPosition += targetRotation * Vector3.forward * AdvInitialForwardOffsetMeters;
             }
             _vrRig.transform.SetPositionAndRotation(targetPosition, targetRotation);
             _gameCameraRigFollow.Reset(mainCamera);
@@ -3964,7 +3989,10 @@ namespace UnityVRMod.Features.VrVisualization
             {
                 if (_currentlyTrackedOriginalCameraGO.TryGetComponent<Camera>(out var trackedCam)) referenceFarClip = trackedCam.farClipPlane;
             }
-            vrCam.farClipPlane = referenceFarClip * _currentAppliedRigScale;
+            // Synthetic 2D cameras use a one-meter far clip. ADV's fixed stage is
+            // farther away, so keep the VR eye camera's visible range large enough.
+            float minimumFarClip = _isUsing2dSyntheticFallbackCamera ? 10f : 0f;
+            vrCam.farClipPlane = Mathf.Max(referenceFarClip * _currentAppliedRigScale, minimumFarClip);
 
             if (vrCam == _leftVrCamera)
             {
@@ -3995,6 +4023,17 @@ namespace UnityVRMod.Features.VrVisualization
             int sceneCullingMask = _vrUiOverlayCamera != null
                 ? (_mainCameraCullingMask & ~GetVrRigLayerMask()) | GetOpenXrHandLayerMask()
                 : _mainCameraCullingMask | GetVrRigLayerMask() | GetOpenXrHandLayerMask();
+
+            if (CameraJudge.IsHybrid2DSceneActive() &&
+                string.Equals(_currentlyTrackedOriginalCameraGO?.name, "Camera_ADV", StringComparison.Ordinal))
+            {
+                // Layer 30 holds only the fixed ADV background. Draw the game's
+                // original character meshes with normal per-eye perspective.
+                vrCam.clearFlags = CameraClearFlags.SolidColor;
+                vrCam.backgroundColor = VrRigClearColor;
+                vrCam.cullingMask = sceneCullingMask | (1 << 30);
+                return;
+            }
 
             if (_isUsingForcedDefaultRenderState)
             {
@@ -5198,6 +5237,7 @@ namespace UnityVRMod.Features.VrVisualization
 
         private void UpdateMainCameraLookAtTargetFollow(Camera mainCamera, bool hasHmdPose, Vector3 hmdWorldPos)
         {
+            if (IsNativeAdvCamera()) return;
             if (_isUsing2dSyntheticFallbackCamera) return;
             if (mainCamera == null) return;
 

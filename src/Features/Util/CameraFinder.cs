@@ -30,6 +30,19 @@ namespace UnityVRMod.Features.Util
         /// <returns>The found Camera component, or null if no suitable camera is found.</returns>
         public static Camera FindGameCamera()
         {
+            // ADV contains real 3D characters even though its UI is 2D. Prefer
+            // the game's perspective ADV camera whenever it is active.
+            if (CameraJudge.IsHybrid2DSceneActive())
+            {
+                GameObject advCameraObject = GameObject.Find("Camera/Camera_ADV");
+                Camera advCamera = advCameraObject != null ? advCameraObject.GetComponent<Camera>() : null;
+                if (advCamera != null && advCamera.enabled && advCamera.gameObject.activeInHierarchy)
+                {
+                    _cachedCamera = advCamera;
+                    return advCamera;
+                }
+            }
+
             // Return the cached camera if it's still valid (not destroyed and is enabled).
             if (_cachedCamera != null && _cachedCamera.enabled)
             {

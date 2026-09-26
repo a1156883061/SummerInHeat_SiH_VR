@@ -1,4 +1,5 @@
 #if OPENXR_BUILD
+using System.Linq;
 using System.Reflection;
 using UnityVRMod.Config;
 using UnityVRMod.Core;
@@ -13,6 +14,10 @@ namespace UnityVRMod.Features.VrVisualization
         private const float PlaneDistanceMeters = 1.25f;
         private const float PlaneVerticalOffsetMeters = -0.08f;
         private const float PlaneWidthMeters = 1.6f;
+        private const float AdvStageDistanceMeters = 3.8f;
+        private const float AdvStageWidthMeters = 3.6f;
+        private const float AdvBackgroundExtraDepthMeters = 0.20f;
+        private const int AdvBackgroundVrLayer = 30;
         private const float RightHandPanelForwardOffsetMeters = 0.01f;
         private const float RightHandPanelUpOffsetMeters = 0.10f;
         private const float RightHandPanelRightOffsetMeters = -0.06f;
@@ -36,6 +41,20 @@ namespace UnityVRMod.Features.VrVisualization
         private GameObject _plane;
         private Material _planeMaterial;
         private RenderTexture _projectionTexture;
+        private RenderTexture _advBackgroundTexture;
+        private RenderTexture _advCharacterTexture;
+        private RenderTexture _advCharacterLeftTexture;
+        private RenderTexture _advCharacterRightTexture;
+        private GameObject _advBackgroundPlane;
+        private GameObject _advCharacterPlane;
+        private Material _advBackgroundMaterial;
+        private Material _advCharacterMaterial;
+        private bool _advStageAnchored;
+        private bool _advDirect3d;
+        private float _nextAdvStateLogTime;
+        private Vector3 _advStageEyeWorldAtAnchor;
+        private Vector3 _advStageWorldCenter;
+        private Quaternion _advStageWorldRotation;
         private int _projectionWidth;
         private int _projectionHeight;
         private GameObject _captureObject;
@@ -67,6 +86,8 @@ namespace UnityVRMod.Features.VrVisualization
 
             _vrRig = vrRig;
             _mainCamera = mainCamera;
+            _advDirect3d = CameraJudge.IsHybrid2DSceneActive() &&
+                string.Equals(mainCamera?.name, "Camera_ADV", StringComparison.Ordinal);
             _projectionWidth = 0;
             _projectionHeight = 0;
             _nextNguiProbeTime = 0f;
@@ -82,6 +103,8 @@ namespace UnityVRMod.Features.VrVisualization
             _lastLoggedPixelRect = default;
             _hasLoggedPixelRect = false;
             _runtimePanelScaleMultiplier = 1f;
+            _advStageAnchored = false;
+            _nextAdvStateLogTime = 0f;
 
             CreateProjectionTextureIfNeeded(force: true);
             CreateProjectionPlane();
@@ -108,8 +131,16 @@ namespace UnityVRMod.Features.VrVisualization
             HandleAnchorToggle(togglePressed);
             UpdatePlanePose(hasRightHandPose, rightHandWorldPos, rightHandWorldRot);
             UpdatePlaneScale();
+            if (!CameraJudge.IsHybrid2DSceneActive()) _advStageAnchored = false;
             LogPixelRectIfNeeded();
             UpdatePlaneVisibility();
+            if (CameraJudge.IsHybrid2DSceneActive() && Time.unscaledTime >= _nextAdvStateLogTime)
+            {
+                _nextAdvStateLogTime = Time.unscaledTime + 4f;
+                VRModCore.Log($"[UI][OpenXR][ADV3D] Stage active bg={_advBackgroundPlane?.activeInHierarchy} char={_advCharacterPlane?.activeInHierarchy} " +
+                    $"anchored={_advStageAnchored} center={_advStageWorldCenter} scale={_advCharacterPlane?.transform.localScale} " +
+                    $"charTexture={_advCharacterMaterial?.mainTexture?.name} UI={_plane?.transform.position}.");
+            }
         }
 
         public void Teardown()
@@ -122,12 +153,20 @@ namespace UnityVRMod.Features.VrVisualization
 
             if (_plane != null) UnityEngine.Object.Destroy(_plane);
             _plane = null;
+            if (_advBackgroundPlane != null) UnityEngine.Object.Destroy(_advBackgroundPlane);
+            if (_advCharacterPlane != null) UnityEngine.Object.Destroy(_advCharacterPlane);
+            _advBackgroundPlane = null;
+            _advCharacterPlane = null;
 
             if (_viewportFrameObject != null) UnityEngine.Object.Destroy(_viewportFrameObject);
             _viewportFrameObject = null;
 
             if (_planeMaterial != null) UnityEngine.Object.Destroy(_planeMaterial);
             _planeMaterial = null;
+            if (_advBackgroundMaterial != null) UnityEngine.Object.Destroy(_advBackgroundMaterial);
+            if (_advCharacterMaterial != null) UnityEngine.Object.Destroy(_advCharacterMaterial);
+            _advBackgroundMaterial = null;
+            _advCharacterMaterial = null;
             if (_viewportFrameMaterial != null) UnityEngine.Object.Destroy(_viewportFrameMaterial);
             _viewportFrameMaterial = null;
             _viewportFrameLine = null;
@@ -144,6 +183,10 @@ namespace UnityVRMod.Features.VrVisualization
                 UnityEngine.Object.Destroy(_projectionTexture);
                 _projectionTexture = null;
             }
+            ReleaseAdvTexture(ref _advBackgroundTexture);
+            ReleaseAdvTexture(ref _advCharacterTexture);
+            ReleaseAdvTexture(ref _advCharacterLeftTexture);
+            ReleaseAdvTexture(ref _advCharacterRightTexture);
 
             _vrRig = null;
             _mainCamera = null;
@@ -162,12 +205,49 @@ namespace UnityVRMod.Features.VrVisualization
             _lastLoggedPixelRect = default;
             _hasLoggedPixelRect = false;
             _runtimePanelScaleMultiplier = 1f;
+            _advStageAnchored = false;
+            _advDirect3d = false;
+            _nextAdvStateLogTime = 0f;
         }
 
         internal bool TryGetPlaneTransform(out Transform planeTransform)
         {
             planeTransform = _plane != null ? _plane.transform : null;
             return planeTransform != null;
+        }
+
+        internal void PrepareAdvEye(int eyeIndex, Vector3 eyeLocalPosition, Vector3 headCenterLocalPosition, Quaternion eyeWorldRotation)
+        {
+            if (!CameraJudge.IsHybrid2DSceneActive() || _vrRig == null || _captureBehaviour == null) return;
+            if (!_advStageAnchored)
+            {
+                Vector3 eyeWorld = _vrRig.transform.TransformPoint(headCenterLocalPosition);
+                Vector3 forward = _advDirect3d ? _vrRig.transform.forward : eyeWorldRotation * Vector3.forward;
+                forward.y = 0f;
+                if (forward.sqrMagnitude < 0.01f) forward = _vrRig.transform.forward;
+                forward.Normalize();
+                _advStageEyeWorldAtAnchor = eyeWorld;
+                _advStageWorldRotation = Quaternion.LookRotation(forward, Vector3.up);
+                _advStageWorldCenter = eyeWorld + forward * AdvStageDistanceMeters;
+                _advStageAnchored = true;
+                UpdateAdvLayerPose();
+                VRModCore.Log(_advDirect3d
+                    ? "[UI][OpenXR][ADV3D] Native character geometry active; background fixed behind models and UI panel movable."
+                    : "[UI][OpenXR][ADV3D] Background and character stage anchored in world; UI panel remains movable.");
+            }
+
+            if (_advDirect3d) return;
+
+            Vector3 currentEyeWorld = _vrRig.transform.TransformPoint(eyeLocalPosition);
+            Vector3 localEyeOffset = Quaternion.Inverse(_advStageWorldRotation) * (currentEyeWorld - _advStageEyeWorldAtAnchor);
+            localEyeOffset.x = Mathf.Clamp(localEyeOffset.x, -0.35f, 0.35f);
+            localEyeOffset.y = Mathf.Clamp(localEyeOffset.y, -0.35f, 0.35f);
+            localEyeOffset.z = Mathf.Clamp(localEyeOffset.z, -0.35f, 0.35f);
+            RenderTexture eyeTexture = eyeIndex == 0 ? _advCharacterLeftTexture : _advCharacterRightTexture;
+            if (_captureBehaviour.RenderAdvStereoEye(eyeTexture, localEyeOffset) && _advCharacterMaterial != null)
+                _advCharacterMaterial.mainTexture = eyeTexture;
+            else if (_advCharacterMaterial != null)
+                _advCharacterMaterial.mainTexture = _advCharacterTexture;
         }
 
         internal void SetManualPose(Vector3 worldPosition, Quaternion worldRotation)
@@ -256,11 +336,57 @@ namespace UnityVRMod.Features.VrVisualization
             renderer.receiveShadows = false;
             renderer.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
             renderer.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
+            _advBackgroundPlane = CreateAdvLayerPlane("OpenXR_ADVBackgroundPlane", _advBackgroundTexture, out _advBackgroundMaterial);
+            _advCharacterPlane = CreateAdvLayerPlane("OpenXR_ADVCharacterPlane", _advCharacterTexture, out _advCharacterMaterial);
             CreateViewportFrameIfNeeded();
             CreateResizeHandlesIfNeeded();
 
             UpdatePlanePose(false, default, Quaternion.identity);
             UpdatePlaneScale();
+        }
+
+        private GameObject CreateAdvLayerPlane(string name, RenderTexture texture, out Material material)
+        {
+            material = null;
+            if (_vrRig == null) return null;
+            GameObject layer = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            layer.name = name;
+            layer.transform.SetParent(_vrRig.transform, false);
+            layer.layer = _advDirect3d && name == "OpenXR_ADVBackgroundPlane" ? AdvBackgroundVrLayer : _vrRig.layer;
+            object collider = layer.GetComponent("Collider");
+            if (collider != null) UnityEngine.Object.Destroy(collider as UnityEngine.Object);
+            MeshRenderer renderer = layer.GetComponent<MeshRenderer>();
+            Shader shader = Shader.Find("Unlit/Transparent");
+            if (shader == null) shader = Shader.Find("Sprites/Default");
+            material = new Material(shader);
+            material.mainTexture = texture;
+            renderer.sharedMaterial = material;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+            renderer.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
+            renderer.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
+            layer.SetActive(false);
+            return layer;
+        }
+
+        private static void ReleaseAdvTexture(ref RenderTexture texture)
+        {
+            if (texture == null) return;
+            texture.Release();
+            UnityEngine.Object.Destroy(texture);
+            texture = null;
+        }
+
+        private static RenderTexture CreateAdvTexture(int width, int height, string name)
+        {
+            RenderTexture texture = new(width, height, 24, RenderTextureFormat.ARGB32)
+            {
+                name = name,
+                useMipMap = false,
+                autoGenerateMips = false
+            };
+            texture.Create();
+            return texture;
         }
 
         private void CreateCaptureBehaviour()
@@ -271,7 +397,9 @@ namespace UnityVRMod.Features.VrVisualization
             if (_vrRig != null) _captureObject.transform.SetParent(_vrRig.transform, false);
 
             _captureBehaviour = _captureObject.AddComponent<NguiCaptureBehaviour>();
-            _captureBehaviour.SetTarget(_projectionTexture);
+            _captureBehaviour.SetAdvDirect3d(_advDirect3d);
+            _captureBehaviour.SetTargets(_projectionTexture, _advBackgroundTexture, _advCharacterTexture,
+                _advCharacterLeftTexture, _advCharacterRightTexture);
             _captureBehaviour.enabled = true;
         }
 
@@ -290,6 +418,10 @@ namespace UnityVRMod.Features.VrVisualization
                 UnityEngine.Object.Destroy(_projectionTexture);
                 _projectionTexture = null;
             }
+            ReleaseAdvTexture(ref _advBackgroundTexture);
+            ReleaseAdvTexture(ref _advCharacterTexture);
+            ReleaseAdvTexture(ref _advCharacterLeftTexture);
+            ReleaseAdvTexture(ref _advCharacterRightTexture);
 
             _projectionTexture = new RenderTexture(targetWidth, targetHeight, 24, RenderTextureFormat.ARGB32)
             {
@@ -298,12 +430,19 @@ namespace UnityVRMod.Features.VrVisualization
                 autoGenerateMips = false
             };
             _projectionTexture.Create();
+            _advBackgroundTexture = CreateAdvTexture(targetWidth, targetHeight, "OpenXR_ADVBackgroundTexture");
+            _advCharacterTexture = CreateAdvTexture(targetWidth, targetHeight, "OpenXR_ADVCharacterTexture");
+            _advCharacterLeftTexture = CreateAdvTexture(targetWidth, targetHeight, "OpenXR_ADVCharacterLeftTexture");
+            _advCharacterRightTexture = CreateAdvTexture(targetWidth, targetHeight, "OpenXR_ADVCharacterRightTexture");
 
             _projectionWidth = targetWidth;
             _projectionHeight = targetHeight;
 
             if (_planeMaterial != null) _planeMaterial.mainTexture = _projectionTexture;
-            if (_captureBehaviour != null) _captureBehaviour.SetTarget(_projectionTexture);
+            if (_advBackgroundMaterial != null) _advBackgroundMaterial.mainTexture = _advBackgroundTexture;
+            if (_advCharacterMaterial != null) _advCharacterMaterial.mainTexture = _advCharacterTexture;
+            if (_captureBehaviour != null) _captureBehaviour.SetTargets(_projectionTexture, _advBackgroundTexture, _advCharacterTexture,
+                _advCharacterLeftTexture, _advCharacterRightTexture);
 
             UpdatePlaneScale();
         }
@@ -392,6 +531,7 @@ namespace UnityVRMod.Features.VrVisualization
             float width = Mathf.Max(0.02f, baseWidth * Mathf.Max(0.01f, viewport.width));
             float height = Mathf.Max(0.02f, baseHeight * Mathf.Max(0.01f, viewport.height));
             _plane.transform.localScale = new Vector3(width, height, 1f);
+            UpdateAdvLayerPose();
 
             if (_viewportFrameLine != null)
             {
@@ -413,6 +553,27 @@ namespace UnityVRMod.Features.VrVisualization
             UpdateResizeHandle(1, new Vector3(-corner, corner, 0.003f), localDiameter);
             UpdateResizeHandle(2, new Vector3(corner, corner, 0.003f), localDiameter);
             UpdateResizeHandle(3, new Vector3(corner, -corner, 0.003f), localDiameter);
+        }
+
+        private void UpdateAdvLayerPose()
+        {
+            if (!_advStageAnchored) return;
+            PositionAdvLayer(_advCharacterPlane, 0f);
+            PositionAdvLayer(_advBackgroundPlane, AdvBackgroundExtraDepthMeters);
+        }
+
+        private void PositionAdvLayer(GameObject layer, float depth)
+        {
+            if (layer == null || _vrRig == null) return;
+            Transform stage = layer.transform;
+            stage.position = _advStageWorldCenter + (_advStageWorldRotation * Vector3.forward) * depth;
+            stage.rotation = _advStageWorldRotation;
+            float distanceScale = (AdvStageDistanceMeters + depth) / AdvStageDistanceMeters;
+            float width = AdvStageWidthMeters * distanceScale;
+            float height = width * _projectionHeight / Mathf.Max(1f, _projectionWidth);
+            Vector3 rigScale = _vrRig.transform.lossyScale;
+            stage.localScale = new Vector3(width / Mathf.Max(0.01f, rigScale.x),
+                height / Mathf.Max(0.01f, rigScale.y), 1f);
         }
 
         private void CreateViewportFrameIfNeeded()
@@ -653,12 +814,19 @@ namespace UnityVRMod.Features.VrVisualization
                 _loggedMissingNguiCamera = false;
             }
 
+            if (isHybrid2dScene) _isVisibilityManuallyToggled = false;
             if (_isVisibilityManuallyToggled) return;
 
             if (_plane.activeSelf != hasSourceCamera)
             {
                 _plane.SetActive(hasSourceCamera);
             }
+            bool showAdvLayers = hasSourceCamera && isHybrid2dScene;
+            if (_advBackgroundPlane != null && _advBackgroundPlane.activeSelf != showAdvLayers)
+                _advBackgroundPlane.SetActive(showAdvLayers);
+            bool showProjectedCharacters = showAdvLayers && !_advDirect3d;
+            if (_advCharacterPlane != null && _advCharacterPlane.activeSelf != showProjectedCharacters)
+                _advCharacterPlane.SetActive(showProjectedCharacters);
         }
 
         internal bool ToggleVisibility()
@@ -758,6 +926,10 @@ namespace UnityVRMod.Features.VrVisualization
             private const float SourceRefreshIntervalSeconds = 0.75f;
 
             private RenderTexture _target;
+            private RenderTexture _advBackgroundTarget;
+            private RenderTexture _advCharacterTarget;
+            private RenderTexture _advCharacterLeftTarget;
+            private RenderTexture _advCharacterRightTarget;
             private Camera _captureCamera;
             private Camera _sourceCamera;
             private readonly List<Camera> _hybridSourceCameras = [];
@@ -766,11 +938,53 @@ namespace UnityVRMod.Features.VrVisualization
             private bool _bindingsResolved;
             private bool _loggedMissingSource;
             private bool _lastFrameHybridMode;
+            private int _lastLoggedAdvSourceMask = -1;
+            private bool _stereoCaptureActive;
+            private bool _loggedStereoCapture;
+            private bool _advDirect3d;
 
-            internal void SetTarget(RenderTexture target)
+            internal void SetAdvDirect3d(bool enabled)
+            {
+                _advDirect3d = enabled;
+            }
+
+            internal void SetTargets(RenderTexture target, RenderTexture advBackground, RenderTexture advCharacter,
+                RenderTexture advCharacterLeft, RenderTexture advCharacterRight)
             {
                 _target = target;
+                _advBackgroundTarget = advBackground;
+                _advCharacterTarget = advCharacter;
+                _advCharacterLeftTarget = advCharacterLeft;
+                _advCharacterRightTarget = advCharacterRight;
+                _stereoCaptureActive = false;
                 if (_captureCamera != null) _captureCamera.targetTexture = _target;
+            }
+
+            internal bool RenderAdvStereoEye(RenderTexture target, Vector3 eyeOffset)
+            {
+                if (!_lastFrameHybridMode || _captureCamera == null || target == null ||
+                    (target != _advCharacterLeftTarget && target != _advCharacterRightTarget)) return false;
+
+                ClearTarget(target);
+                bool rendered = false;
+                foreach (Camera source in _hybridSourceCameras)
+                {
+                    if (source == null || !source.enabled || !source.gameObject.activeInHierarchy) continue;
+                    if (source.cullingMask == 0 || (source.cullingMask & (1 << 10)) != 0 ||
+                        ((source.cullingMask & (1 << 5)) != 0 && source.orthographic)) continue;
+                    RenderAdvSource(source, target, rendered, eyeOffset);
+                    rendered = true;
+                }
+                if (rendered)
+                {
+                    _stereoCaptureActive = true;
+                    if (!_loggedStereoCapture)
+                    {
+                        VRModCore.Log($"[UI][OpenXR][ADV3D] Stereo character camera rendered eye offset={eyeOffset}.");
+                        _loggedStereoCapture = true;
+                    }
+                }
+                return rendered;
             }
 
             private void LateUpdate()
@@ -944,6 +1158,8 @@ namespace UnityVRMod.Features.VrVisualization
                 if (_captureCamera == null || _sourceCamera == null || _target == null) return;
 
                 _captureCamera.CopyFrom(_sourceCamera);
+                _captureCamera.transform.position = _sourceCamera.transform.position;
+                _captureCamera.transform.rotation = _sourceCamera.transform.rotation;
                 _captureCamera.enabled = false;
                 _captureCamera.stereoTargetEye = StereoTargetEyeMask.None;
                 _captureCamera.targetTexture = _target;
@@ -968,27 +1184,73 @@ namespace UnityVRMod.Features.VrVisualization
             private void RenderFromHybridSourceCameras()
             {
                 if (_captureCamera == null || _target == null || _hybridSourceCameras.Count == 0) return;
+                if (_advBackgroundTarget == null || _advCharacterTarget == null) return;
 
-                ClearTarget();
+                ClearTarget(_target);
+                ClearTarget(_advBackgroundTarget);
+                ClearTarget(_advCharacterTarget);
+                bool renderedBackground = false;
+                bool renderedCharacter = false;
+                bool renderedUi = false;
                 for (int i = 0; i < _hybridSourceCameras.Count; i++)
                 {
                     Camera source = _hybridSourceCameras[i];
                     if (source == null || !source.enabled || !source.gameObject.activeInHierarchy) continue;
-
-                    _captureCamera.CopyFrom(source);
-                    _captureCamera.enabled = false;
-                    _captureCamera.stereoTargetEye = StereoTargetEyeMask.None;
-                    _captureCamera.targetTexture = _target;
-                    _captureCamera.Render();
+                    int mask = source.cullingMask;
+                    if (mask == 0) continue;
+                    if ((mask & (1 << 10)) != 0)
+                    {
+                        RenderAdvSource(source, _advBackgroundTarget, renderedBackground);
+                        renderedBackground = true;
+                    }
+                    else if ((mask & (1 << 5)) != 0 && source.orthographic)
+                    {
+                        RenderAdvSource(source, _target, renderedUi);
+                        renderedUi = true;
+                    }
+                    else
+                    {
+                        if (!_advDirect3d && !_stereoCaptureActive)
+                            RenderAdvSource(source, _advCharacterTarget, renderedCharacter);
+                        renderedCharacter = true;
+                    }
                 }
+                int sourceMask = (renderedBackground ? 1 : 0) | (renderedCharacter ? 2 : 0) | (renderedUi ? 4 : 0);
+                if (sourceMask != _lastLoggedAdvSourceMask)
+                {
+                    VRModCore.Log($"[UI][OpenXR][ADV2.5D] Capture layers changed: background={renderedBackground}, characters={renderedCharacter}, UI={renderedUi}; cameras=" +
+                        string.Join(", ", _hybridSourceCameras.Select(c => c == null ? "null" : $"{c.name}(0x{c.cullingMask:X8})")));
+                    _lastLoggedAdvSourceMask = sourceMask;
+                }
+            }
+
+            private void RenderAdvSource(Camera source, RenderTexture target, bool preserveColor, Vector3 eyeOffset = default)
+            {
+                _captureCamera.CopyFrom(source);
+                _captureCamera.transform.position = source.transform.position +
+                    source.transform.right * eyeOffset.x + source.transform.up * eyeOffset.y + source.transform.forward * eyeOffset.z;
+                _captureCamera.transform.rotation = source.transform.rotation;
+                _captureCamera.enabled = false;
+                _captureCamera.stereoTargetEye = StereoTargetEyeMask.None;
+                _captureCamera.targetTexture = target;
+                _captureCamera.clearFlags = preserveColor ? CameraClearFlags.Depth : CameraClearFlags.SolidColor;
+                _captureCamera.backgroundColor = Color.clear;
+                _captureCamera.allowHDR = false;
+                _captureCamera.allowMSAA = false;
+                _captureCamera.Render();
             }
 
             private void ClearTarget()
             {
-                if (_target == null) return;
+                ClearTarget(_target);
+            }
+
+            private static void ClearTarget(RenderTexture target)
+            {
+                if (target == null) return;
 
                 RenderTexture previous = RenderTexture.active;
-                RenderTexture.active = _target;
+                RenderTexture.active = target;
                 GL.Clear(true, true, Color.clear);
                 RenderTexture.active = previous;
             }
