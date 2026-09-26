@@ -79,8 +79,9 @@ You can try other color combinations, but the settings above produced the best r
 | **Teleport Aim** | **Right Stick ↑** (always right hand) |
 | **Confirm Teleport** | **Right Trigger** (always right hand) |
 | **Snap Turning** | **Right Stick ←→** (always right hand) |
-| **Smooth Turning** | **Right Stick Click (Hold)** + Move ←→ |
+| **Smooth Turning** | **Right Stick Click (Hold)** + Move ←→, or **Hold Grip** + **Right Stick ←→** |
 | **Smooth Move / Walk** | **Left Stick** (camera-relative, configurable speed) |
+| **Move Up / Down** | **Hold Grip** + **Left Stick ↑ / ↓** |
 | **Toggle Follow / Free Mode** | **Left Stick Click** |
 | **Move Viewport** | **Hold Grip (either hand)** & Drag |
 | **Toggle UI Anchor/Follow** | **Click Y(Left) / B(Right)** |

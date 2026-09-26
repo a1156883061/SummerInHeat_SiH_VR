@@ -175,8 +175,8 @@ namespace UnityVRMod.Features.VrVisualization
 
             if (!isAiming)
             {
-                UpdateTurn(vrRig, rightStickX, isSmoothTurnHeld, hasHmdWorldPose, hmdWorldPos);
-                UpdateSmoothMove(vrRig, leftStickX, leftStickY, cameraForwardWorld);
+                UpdateTurn(vrRig, rightStickX, isSmoothTurnHeld || isGripHeld, hasHmdWorldPose, hmdWorldPos);
+                UpdateSmoothMove(vrRig, leftStickX, leftStickY, cameraForwardWorld, isGripHeld);
             }
             UpdateGripDragTranslate(vrRig, isGripHeld, hasGripLocalPose, rightGripTrackingLocalPos);
 
@@ -376,7 +376,7 @@ namespace UnityVRMod.Features.VrVisualization
             }
         }
 
-        private void UpdateSmoothMove(GameObject vrRig, float moveX, float moveY, Vector3 cameraForward)
+        private void UpdateSmoothMove(GameObject vrRig, float moveX, float moveY, Vector3 cameraForward, bool gripHeld)
         {
             const float deadzone = 0.15f;
             float magnitude = Mathf.Sqrt(moveX * moveX + moveY * moveY);
@@ -385,7 +385,8 @@ namespace UnityVRMod.Features.VrVisualization
             float speed = magnitude * GetSmoothMoveSpeed() * Time.deltaTime;
             Vector3 flatForward = Vector3.ProjectOnPlane(cameraForward, Vector3.up).normalized;
             Vector3 flatRight = Vector3.Cross(Vector3.up, flatForward).normalized;
-            Vector3 move = (flatForward * moveY + flatRight * moveX).normalized * speed;
+            Vector3 forwardOrUp = gripHeld ? Vector3.up : flatForward;
+            Vector3 move = (forwardOrUp * moveY + flatRight * moveX).normalized * speed;
             vrRig.transform.position += move;
         }
 
