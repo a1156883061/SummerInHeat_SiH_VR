@@ -34,6 +34,7 @@
 2.  **Deploy Mod Files**: Extract the contents of this release into the game root folder, the same folder that contains `『夏のサカり』起動ランチャー.exe`.
 3.  **Configure**:
     *   Launch the game once to generate initial configuration files.
+    *   To move the hand-following UI panel farther from the controller, edit `OpenXR UI Panel Hand Forward Offset` in `BepInEx/config/com.newunitymodder.unityvrmod.cfg`. The default is `0.25` meters; values are limited to `0`–`0.75` meters. Restart the game after editing.
 4.  **Launch VR using either method**:
     *   Start your VR runtime (e.g., Meta Quest Link or Virtual Desktop).
     *   Launch the game and press **F11** to toggle VR mode (the toggle key can be customized in the configuration file).

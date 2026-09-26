@@ -50,6 +50,7 @@ namespace UnityVRMod.Config
         public static ConfigElement<float> OpenXR_SmoothMoveSpeed;
         public static ConfigElement<float> OpenXR_GripDragSensitivity;
         public static ConfigElement<float> OpenXR_UiPanelScale;
+        public static ConfigElement<float> OpenXR_UiPanelHandForwardOffset;
         public static ConfigElement<float> OpenXR_PanelResizeSensitivity;
         public static ConfigElement<float> OpenXR_SnapTurnDegrees;
         public static ConfigElement<float> OpenXR_SmoothTurnDegreesPerSecond;
@@ -220,6 +221,9 @@ namespace UnityVRMod.Config
 
             OpenXR_UiPanelScale = new ConfigElement<float>("OpenXR UI Panel Scale",
                 "[OpenXR ONLY] Scale multiplier for the projected NGUI panel. 1.0 = default size.", 1.0f);
+
+            OpenXR_UiPanelHandForwardOffset = new ConfigElement<float>("OpenXR UI Panel Hand Forward Offset",
+                "[OpenXR ONLY] Distance in meters from the controller toward its pointing direction while the UI panel follows the hand.", 0.25f);
 
             OpenXR_PanelResizeSensitivity = new ConfigElement<float>("OpenXR Panel Resize Sensitivity",
                 "[OpenXR ONLY] Multiplier for corner-handle panel resize responsiveness. 1.0 = linear; 2.0 = stronger resize.", 2.0f);

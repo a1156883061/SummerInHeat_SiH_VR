@@ -34,6 +34,7 @@
 2. **部署模组文件**：将发布包中的内容解压到 `游戏主目录（即"『夏のサカり』起動ランチャー.exe"所在的目录）` 文件夹。
 3. **配置**：
    *   首次启动游戏以生成初始配置文件。
+   *   要调整跟随手部的 UI 面板距离，请修改 `BepInEx/config/com.newunitymodder.unityvrmod.cfg` 中的 `OpenXR UI Panel Hand Forward Offset`。默认值为 `0.25` 米，可设置范围为 `0`–`0.75` 米。修改后请重启游戏。
 4. **两个方法启动 VR**：
    *   启动 VR 运行时（如 Meta Quest Link 或 Virtual Desktop）。
    *   启动游戏，按 **F11** 切换 VR 模式（可在配置文件中自定义按键）。

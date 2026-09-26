@@ -13,7 +13,6 @@ namespace UnityVRMod.Features.VrVisualization
         private const float PlaneDistanceMeters = 1.25f;
         private const float PlaneVerticalOffsetMeters = -0.08f;
         private const float PlaneWidthMeters = 1.6f;
-        private const float RightHandPanelForwardOffsetMeters = 0.01f;
         private const float RightHandPanelUpOffsetMeters = 0.10f;
         private const float RightHandPanelRightOffsetMeters = -0.06f;
         private const float NguiProbeIntervalSeconds = 0.75f;
@@ -350,7 +349,8 @@ namespace UnityVRMod.Features.VrVisualization
 
             if (hasRightHandPose)
             {
-                Vector3 localOffset = new(RightHandPanelRightOffsetMeters, RightHandPanelUpOffsetMeters, RightHandPanelForwardOffsetMeters);
+                float forwardOffset = Mathf.Clamp(ConfigManager.OpenXR_UiPanelHandForwardOffset?.Value ?? 0.25f, 0f, 0.75f);
+                Vector3 localOffset = new(RightHandPanelRightOffsetMeters, RightHandPanelUpOffsetMeters, forwardOffset);
                 Vector3 worldPos = rightHandWorldPos + (rightHandWorldRot * localOffset);
                 Vector3 forward = rightHandWorldRot * Vector3.forward;
                 Vector3 up = rightHandWorldRot * Vector3.up;
