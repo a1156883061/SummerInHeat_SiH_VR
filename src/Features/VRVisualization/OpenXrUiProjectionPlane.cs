@@ -277,8 +277,12 @@ namespace UnityVRMod.Features.VrVisualization
 
         private void CreateProjectionTextureIfNeeded(bool force)
         {
-            int targetWidth = Mathf.Clamp(Screen.width, 640, MaxProjectionTextureDimension);
-            int targetHeight = Mathf.Clamp(Screen.height, 360, MaxProjectionTextureDimension);
+            int screenWidth = Mathf.Max(1, Screen.width);
+            int screenHeight = Mathf.Max(1, Screen.height);
+            float textureScale = Mathf.Min(1f,
+                (float)MaxProjectionTextureDimension / Mathf.Max(screenWidth, screenHeight));
+            int targetWidth = Mathf.Max(1, Mathf.RoundToInt(screenWidth * textureScale));
+            int targetHeight = Mathf.Max(1, Mathf.RoundToInt(screenHeight * textureScale));
             if (!force && targetWidth == _projectionWidth && targetHeight == _projectionHeight && _projectionTexture != null)
             {
                 return;
